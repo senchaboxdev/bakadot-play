@@ -8,17 +8,17 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=f63b592";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=f63b592";
-import { Gloves } from "./gloves.js?v=f63b592";
-import { Effects } from "./effects.js?v=f63b592";
-import { GameAudio } from "./audio.js?v=f63b592";
-import { Hud } from "./hud.js?v=f63b592";
-import { Tweens, lerp } from "./tween.js?v=f63b592";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=f63b592";
-import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=f63b592";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=f63b592";
-import { startVision } from "./vision.js?v=f63b592";
+import { buildArena, loadEnvironment } from "./arena.js?v=2145e1a";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=2145e1a";
+import { Gloves } from "./gloves.js?v=2145e1a";
+import { Effects } from "./effects.js?v=2145e1a";
+import { GameAudio } from "./audio.js?v=2145e1a";
+import { Hud } from "./hud.js?v=2145e1a";
+import { Tweens, lerp } from "./tween.js?v=2145e1a";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=2145e1a";
+import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=2145e1a";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=2145e1a";
+import { startVision } from "./vision.js?v=2145e1a";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -390,9 +390,9 @@ async function freeAttack() {
   state.attackTimer = lerp(FREE.attackEvery[0], FREE.attackEvery[1], Math.random());
 }
 
-function feedbackBlock() {
+function feedbackBlock(chip) {
   audio.play("block");
-  hud.message("BLOCKED!", "#4fc3f7");
+  hud.message(chip ? `BLOCKED!  -${chip}` : "BLOCKED!", "#4fc3f7");
   state.shake = Math.max(state.shake, 0.02);
 }
 

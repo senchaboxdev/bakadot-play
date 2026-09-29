@@ -8,7 +8,7 @@
 //   banner(text, color, seconds)
 //   opponentAttack(warnSeconds, onImpact) -> Promise (เล่นท่าบุก เรียก onImpact ตอนหมัดถึง)
 //   isGuarding() -> bool
-//   block() / playerHit(damage)
+//   block(chipDamage) / playerHit(damage)
 //   opponentState({ guard, open })
 //   finished(result)
 
@@ -16,6 +16,7 @@ export const PLAYER_MAX_HP = 100;
 export const WEAPON_DAMAGE = { punch: 3, elbow: 6, knee: 7, kick: 6 };
 export const GUARD_FACTOR = { punch: 0.3, elbow: 0.5, knee: 1.0, kick: 0.5 };
 export const OPEN_BONUS = 1.5;
+export const BLOCK_CHIP = 0.25; // การ์ดทันก็ยังเสียเลือดส่วนนี้ (การ์ดอย่างเดียวชนะไม่ได้)
 const INTRO_TIME = 2.2; // "ROUND n" แล้ว "FIGHT!"
 export const DODGE_COOLDOWN = 1.0; // วินาที
 
@@ -104,8 +105,11 @@ export class Fight {
   resolveAttack() {
     if (!this.active) return;
     if (this.hooks.isGuarding()) {
+      const chip = Math.round(this.f.damage * BLOCK_CHIP * 10) / 10;
       this.stats.blocks += 1;
-      this.hooks.block();
+      this.playerHp = Math.max(this.playerHp - chip, 0);
+      this.hooks.block(chip);
+      if (this.playerHp <= 0) this.finish(false, "KO");
       return;
     }
     this.stats.hitsTaken += 1;
