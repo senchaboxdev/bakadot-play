@@ -9,6 +9,7 @@
 // guardChance   โอกาสยกการ์ดก่อนบุก (หมัดผู้เล่นเบาลงมากตอนนี้)
 // guardTime     [min, max] วินาทีที่ยกการ์ด
 // openTime      วินาทีที่หอบ/เปิดช่องหลังบุก (ตีตอนนี้แรงขึ้น)
+// dodgeChance   โอกาสหลบหมัดตอนยืนเชิง (0..1)
 // venue         ฉากรอบเวที (ดู VENUES ใน venues.js)
 
 export const FIGHTERS = {
@@ -27,6 +28,7 @@ export const FIGHTERS = {
     guardChance: 0.35,
     guardTime: [1.5, 2.5],
     openTime: 1.5,
+    dodgeChance: 0.15,
     shorts: "#1565c0",
     model: "boxer",
     hint: "P'Tom raises his guard sometimes. Punches barely hurt then - use elbows and knees, or hit him right after he attacks.",

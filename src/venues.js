@@ -634,7 +634,7 @@ function buildStadium(g, { renderer, apron }) {
   // จอใหญ่หลังอัฒจันทร์
   const screen = signTexture([
     { text: "BAKADOT", color: "#ffffff", size: 150, y: 0.4 },
-    { text: "FINAL FIGHT · ยกสุดท้าย", color: "#f5c542", size: 64, y: 0.8 },
+    { text: "FIGHT NIGHT · ศึกมวยไทย", color: "#f5c542", size: 64, y: 0.8 },
   ], { bg: "#0a1030", glowColor: "#39c6ff" });
   add(g, new THREE.Mesh(new THREE.PlaneGeometry(9, 2.25), new THREE.MeshBasicMaterial({ map: screen, color: new THREE.Color(1.4, 1.4, 1.4) })), 0, Y0 + 6.6, -17.5);
   add(g, new THREE.Mesh(new THREE.BoxGeometry(9.3, 2.5, 0.2), std("#05060a", 0.6)), 0, Y0 + 6.6, -17.65);

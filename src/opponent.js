@@ -229,9 +229,14 @@ export class Opponent {
     this.flashLevel = amount;
   }
 
+  /** สไลด์หลบหมัดไปด้านข้าง (side = -1 ซ้าย / 1 ขวา) แล้วกลับที่เดิม */
+  dodge(side = Math.random() < 0.5 ? -1 : 1) {
+    this.dodgeMove = { side, time: 0 };
+  }
+
   update(dt) {
     this.mixer.update(dt);
-    if (this.fakePoses) this.applyFakePose(dt);
+    this.applyPose(dt);
     if (this.flashLevel > 0) {
       this.flashLevel = Math.max(this.flashLevel - dt * 5, 0);
       for (const m of this.materials) {
@@ -241,18 +246,33 @@ export class Opponent {
     }
   }
 
-  applyFakePose(dt) {
+  /** ท่าปลอม (ถ้ามี) + ฟุตเวิร์กโยกซ้ายขวา + สไลด์หลบ บนกลุ่ม body */
+  applyPose(dt) {
     this.bobTime = (this.bobTime ?? 0) + dt;
-    const bob = Math.sin(this.bobTime * 4) * 0.02;
-    let pose = { lean: 0, twist: 0, y: bob, z: 0 };
-    if (this.proc) {
+    const t = this.bobTime;
+    let pose = { lean: 0, twist: 0, y: this.fakePoses ? Math.sin(t * 4) * 0.02 : 0, z: 0 };
+    if (this.fakePoses && this.proc) {
       this.proc.time += dt;
       pose = proceduralPose(this.proc.name, this.proc.time, this.proc.withClip);
       const end = this.proc.withClip ? 2 * PUNCH_PEAK : 0.45;
       if (this.proc.name !== "Death" && this.proc.time > end) this.proc = null;
     }
-    this.body.rotation.set(pose.lean, pose.twist, 0);
-    this.body.position.set(0, pose.y, pose.z);
+    // ฟุตเวิร์ก: ขยับซ้ายขวาช้าๆ (ไม่ขยับตอนล้ม)
+    const down = this.proc?.name === "Death";
+    let x = down ? 0 : Math.sin(t * 1.4) * 0.12 + Math.sin(t * 0.6) * 0.06;
+    let roll = 0;
+    if (this.dodgeMove) { // สไลด์ออก 0.12 วิ ค้าง แล้วกลับใน 0.35 วิ
+      const d = this.dodgeMove;
+      d.time += dt;
+      const k = d.time < 0.12 ? d.time / 0.12 : Math.max(0, 1 - (d.time - 0.2) / 0.35);
+      const e = k * k * (3 - 2 * k);
+      x += d.side * 0.45 * e;
+      roll = -d.side * 0.35 * e;
+      pose.y -= 0.12 * e; // ย่อตัวลงนิดๆ
+      if (d.time > 0.55) this.dodgeMove = null;
+    }
+    this.body.rotation.set(pose.lean, pose.twist, roll);
+    this.body.position.set(x, pose.y, pose.z);
   }
 
   reset() {

@@ -1,6 +1,7 @@
 // Task 6.1: การประลองจริง (โหมดเนื้อเรื่อง) — ตรรกะล้วน ไม่ผูกกับภาพ/เสียง (ทดสอบด้วย node ได้)
 // - HP สองฝ่าย, ดาเมจตามอาวุธ (คู่ต่อสู้ยกการ์ด = หมัดเบาลงมาก, เข่าทะลุการ์ด)
 // - AI: ยืนเชิง -> (ยกการ์ด) -> ง้างเตือน+บุก -> หอบเปิดช่อง (ตีตอนนี้แรงขึ้น) -> วนใหม่
+// - ตอนยืนเชิง หลบหมัดได้ (dodgeChance) — ไม่หลบตอนการ์ด/บุก/หอบ และไม่หลบติดกันเร็วกว่า DODGE_COOLDOWN
 // - แบ่งยก + พัก, ชนะเมื่อน็อก หรือเหลือ HP (เป็นสัดส่วน) มากกว่าเมื่อครบยก
 //
 // เวลาเดินด้วย update(dt) เท่านั้น (ไม่มี setTimeout) ส่วนภาพ/เสียงทำผ่าน hooks:
@@ -16,6 +17,7 @@ export const WEAPON_DAMAGE = { punch: 3, elbow: 6, knee: 7, kick: 6 };
 export const GUARD_FACTOR = { punch: 0.3, elbow: 0.5, knee: 1.0, kick: 0.5 };
 export const OPEN_BONUS = 1.5;
 const INTRO_TIME = 2.2; // "ROUND n" แล้ว "FIGHT!"
+export const DODGE_COOLDOWN = 1.0; // วินาที
 
 export const AI = { IDLE: "idle", GUARD: "guard", ATTACK: "attack", OPEN: "open", DOWN: "down" };
 
@@ -67,6 +69,7 @@ export class Fight {
       }
     } else if (this.phase === "fight") {
       this.elapsed += dt;
+      this.dodgeWait = Math.max((this.dodgeWait ?? 0) - dt, 0);
       if (this.phaseTime <= 0) return this.endRound();
       this.updateAi(dt);
     }
@@ -119,10 +122,15 @@ export class Fight {
 
   // ---------- ผู้เล่นออกอาวุธ ----------
 
-  /** คืน { damage, guarded, open } — ไม่ได้อยู่ในช่วงสู้ = damage 0 */
+  /** คืน { damage, guarded, open, dodged } — ไม่ได้อยู่ในช่วงสู้ = damage 0 */
   onStrike(kind) {
-    if (!this.active) return { damage: 0, guarded: false, open: false };
+    if (!this.active) return { damage: 0, guarded: false, open: false, dodged: false };
     this.stats[kind] = (this.stats[kind] ?? 0) + 1;
+    if (this.ai === AI.IDLE && !this.dodgeWait && this.random() < (this.f.dodgeChance ?? 0)) {
+      this.dodgeWait = DODGE_COOLDOWN;
+      this.stats.dodged = (this.stats.dodged ?? 0) + 1;
+      return { damage: 0, guarded: false, open: false, dodged: true };
+    }
     const guarded = this.ai === AI.GUARD;
     const open = this.ai === AI.OPEN;
     let damage = WEAPON_DAMAGE[kind] ?? 3;
@@ -133,7 +141,7 @@ export class Fight {
     }
     this.oppHp = Math.max(this.oppHp - damage, 0);
     if (this.oppHp <= 0) this.finish(true, "KO");
-    return { damage, guarded, open };
+    return { damage, guarded, open, dodged: false };
   }
 
   // ---------- ยก / จบ ----------

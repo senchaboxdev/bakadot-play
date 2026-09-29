@@ -182,3 +182,28 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; col
 
 /* ระหว่างหน้าจอเริ่ม ซ่อนเมนูเกมด้านหลังไม่ให้ซ้อนตัวหนังสือ */
 body:has(#start:not([hidden])) #hud .screen { visibility: hidden; }
+
+/* ซ้อม: หลอดเลือดคู่ซ้อม */
+#hud .free-panel { min-width: min(92vw, 460px); }
+#hud .free-hp { margin-bottom: 6px; }
+#hud .free-title { font-size: 12px; letter-spacing: 3px; color: var(--gold); text-align: center; }
+#hud .free-panel .score { font-size: clamp(14px, 1.8vw, 20px); letter-spacing: 1px; white-space: nowrap; }
+#hud .pop[data-kind="miss"] { color: #b9c3d6; }
+
+/* เวลาออกกำลังกาย + แคลอรี */
+#hud .workout {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 4px 16px 6px;
+  font-size: clamp(15px, 1.8vw, 20px); white-space: pre; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 999px; display: none;
+}
+#hud[data-mode="free"] .workout, #hud[data-mode="fight"] .workout { display: block; }
+#hud .today { margin: 0; font-size: clamp(14px, 1.8vw, 18px); color: var(--green); font-weight: 400; }
+#hud .workout-sum { margin: 4px 0 0; font-size: clamp(16px, 2vw, 22px); color: var(--green); white-space: pre; }
+
+/* น้ำหนักตัว (หน้าจอเริ่ม) */
+#start .weight { font-size: 16px; font-weight: 400; opacity: 0.9; }
+#start .weight span { opacity: 0.6; font-size: 14px; }
+#start .weight input { width: 4.2em; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--panel-edge); background: rgba(255,255,255,0.08); color: #fff; font: 700 16px var(--font); text-align: center; }
+
+/* เวอร์ชัน: มุมขวาล่าง เฉพาะหน้าจอเริ่ม/เมนู/สรุปผล */
+#version { position: fixed; right: 10px; bottom: 6px; z-index: 30; font-size: 12px; opacity: 0.45; pointer-events: none; display: none; }
+body:has(#start:not([hidden])) #version, body:has(#hud[data-mode="menu"]) #version, body:has(#hud[data-mode="result"]) #version { display: block; }

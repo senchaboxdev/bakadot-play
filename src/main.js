@@ -8,16 +8,22 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=11c252a";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=11c252a";
-import { Gloves } from "./gloves.js?v=11c252a";
-import { Effects } from "./effects.js?v=11c252a";
-import { GameAudio } from "./audio.js?v=11c252a";
-import { Hud } from "./hud.js?v=11c252a";
-import { Tweens, lerp } from "./tween.js?v=11c252a";
-import { Fight } from "./fight.js?v=11c252a";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=11c252a";
-import { startVision } from "./vision.js?v=11c252a";
+import { buildArena, loadEnvironment } from "./arena.js?v=073660e";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=073660e";
+import { Gloves } from "./gloves.js?v=073660e";
+import { Effects } from "./effects.js?v=073660e";
+import { GameAudio } from "./audio.js?v=073660e";
+import { Hud } from "./hud.js?v=073660e";
+import { Tweens, lerp } from "./tween.js?v=073660e";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=073660e";
+import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=073660e";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=073660e";
+import { startVision } from "./vision.js?v=073660e";
+
+/** localStorage, or a stand-in when the browser blocks it (private mode) */
+function localStorageSafe() {
+  try { return window.localStorage; } catch { return { getItem: () => null, setItem: () => {} }; }
+}
 
 const STRIKE_TYPES = {
   punch_left: "punch", punch_right: "punch",
@@ -25,7 +31,9 @@ const STRIKE_TYPES = {
   knee_left: "knee", knee_right: "knee",
   kick_left: "kick", kick_right: "kick",
 };
-const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, penalty: 5, shorts: "#c62828" };
+// เล่นอิสระ = ซ้อมกับคู่ซ้อม: ต่อยจนหมดหลอด = น็อก แล้วลุกขึ้นมาใหม่
+const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, hp: 40, dodgeChance: 0.12, getUp: 2.8, shorts: "#c62828" };
+const DODGE_COOLDOWN = 1.0;
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
 const OUT_TIME = 0.08; // นวมพุ่งออก
 const BACK_TIME = 0.15; // นวมดึงกลับ
@@ -116,6 +124,8 @@ const state = {
   guarding: false,
   connected: false,
   counts: { punch: 0, elbow: 0, knee: 0, kick: 0 },
+  free: { hp: FREE.hp, max: FREE.hp, kos: 0, hitsTaken: 0, down: false, dodgeWait: 0 },
+  workout: new Workout(loadWeight(localStorageSafe()) ?? DEFAULT_WEIGHT),
   score: 0,
   attacking: false,
   attackTimer: 4,
@@ -164,7 +174,17 @@ window.addEventListener("pointerdown", (e) => {
 
 // ---------- โหมด ----------
 
+/** เก็บเวลา/แคลอรีตั้งแต่เริ่มไฟต์/ซ้อมเข้ายอดวันนี้ (คืนยอดวันนี้) */
+function bankWorkout() {
+  const w = state.workout.sinceMark();
+  state.workout.mark();
+  const today = addToToday(localStorageSafe(), w.seconds, w.kcal);
+  hud.setToday(today);
+  return { workout: w, today };
+}
+
 function toMenu() {
+  if (state.mode === "free" || state.mode === "fight") bankWorkout();
   state.mode = "menu";
   state.fight = null;
   state.oppState = { guard: false, open: false };
@@ -179,6 +199,8 @@ function startFree() {
   state.fight = null;
   state.score = 0;
   for (const k in state.counts) state.counts[k] = 0;
+  Object.assign(state.free, { hp: FREE.hp, kos: 0, hitsTaken: 0, down: false, dodgeWait: 0 });
+  state.workout.mark();
   state.attackTimer = 4;
   state.oppState = { guard: false, open: false };
   opponent.reset();
@@ -196,6 +218,7 @@ async function startFight(id, overrides = {}) {
   state.mode = "loading";
   await showOpponent(fighter.model);
   arena.setVenue(fighter.venue);
+  state.workout.mark();
   state.mode = "fight";
   opponent.setShorts(fighter.shorts);
   hud.setMode("fight");
@@ -211,6 +234,7 @@ async function startFight(id, overrides = {}) {
 }
 
 async function onFightFinished(r) {
+  Object.assign(r, bankWorkout());
   state.mode = "result";
   const last = state.stage === STAGES.length - 1;
   if (r.win) {
@@ -242,16 +266,31 @@ function strike(action) {
   const side = action.endsWith("left") ? "left" : "right";
   let landed = true;
   let blocked = false;
+  let dodged = false;
   if (state.mode === "fight") {
     const r = state.fight.onStrike(kind);
     landed = r.damage > 0;
     blocked = r.guarded;
-    if (landed) hud.showStrike(kind, r);
+    dodged = r.dodged;
+    if (landed || dodged) hud.showStrike(kind, r);
   } else {
+    if (state.free.down) return; // คู่ซ้อมกำลังลุก
     state.counts[kind] += 1;
     state.score += 1;
-    hud.showStrike(kind);
+    const f = state.free;
+    if (!state.attacking && !f.dodgeWait && Math.random() < FREE.dodgeChance) {
+      f.dodgeWait = DODGE_COOLDOWN;
+      dodged = true;
+      landed = false;
+      hud.showStrike(kind, { dodged });
+    } else {
+      const damage = WEAPON_DAMAGE[kind] ?? 3;
+      f.hp = Math.max(f.hp - damage, 0);
+      hud.showStrike(kind, { damage });
+      if (f.hp <= 0) sparringKO();
+    }
   }
+  if (dodged) opponent.dodge(side === "left" ? 1 : -1); // หลบออกจากทางหมัด
   const hit = () => {
     if (!landed) return;
     if (blocked) return audio.play("block"); // คู่ต่อสู้การ์ดรับไว้
@@ -272,7 +311,7 @@ function strike(action) {
 
 function hitReaction(side, kind) {
   // ตอนบุกอยู่ไม่ขัดท่าชก / ตอนเพิ่งน็อก (mode = result) ไม่ทับท่าล้ม
-  const fighting = state.mode === "free" || state.mode === "fight";
+  const fighting = (state.mode === "free" && !state.free.down) || state.mode === "fight";
   if (fighting && !state.attacking) opponent.play(Math.random() < 0.5 ? "HitRecieve" : "HitRecieve_2", { loop: false, fade: 0.05 });
   const lean = side === "left" ? 0.12 : -0.12;
   tweens.to(0.06, (p) => (opponent.group.rotation.z = lean * p))
@@ -304,12 +343,30 @@ async function opponentAttack(warn, onImpact) {
   state.attacking = false;
 }
 
+async function sparringKO() {
+  const f = state.free;
+  f.down = true;
+  f.kos += 1;
+  opponent.play("Death", { loop: false, fade: 0.1 });
+  audio.play("heavy");
+  arena.cheer(1);
+  hud.showBanner("K.O.!", "#ffd400", 1.6);
+  await tweens.wait(FREE.getUp);
+  if (state.mode !== "free") return;
+  opponent.reset();
+  f.hp = f.max;
+  f.down = false;
+  state.attackTimer = 2.5;
+  hud.showBanner("FIGHT!", "#ffd400", 1.0);
+}
+
 async function freeAttack() {
+  if (state.free.down) return void (state.attackTimer = 1);
   await opponentAttack(FREE.warn, () => {
     if (state.mode !== "free") return;
     if (state.guarding) return feedbackBlock();
-    state.score = Math.max(state.score - FREE.penalty, 0);
-    feedbackPlayerHit(FREE.penalty);
+    state.free.hitsTaken += 1;
+    feedbackPlayerHit();
   });
   state.attackTimer = lerp(FREE.attackEvery[0], FREE.attackEvery[1], Math.random());
 }
@@ -322,7 +379,7 @@ function feedbackBlock() {
 
 function feedbackPlayerHit(amount) {
   audio.play("playerHit");
-  hud.message(`HIT!  -${amount}`, "#ff5252");
+  hud.message(amount ? `HIT!  -${amount}` : "HIT!", "#ff5252");
   hud.hitFlash();
   state.shake = 0.08;
 }
@@ -341,6 +398,11 @@ renderer.setAnimationLoop(() => {
   gloves.update(dt, state.guarding);
 
   if (state.mode === "fight") state.fight?.update(dt);
+  state.free.dodgeWait = Math.max(state.free.dodgeWait - dt, 0);
+  // นับเวลาออกกำลังกาย: สู้/ซ้อม = active, พักระหว่างยก = rest, เมนู/สรุปผล = ไม่นับ
+  const activity = state.mode === "free" ? "active"
+    : state.mode === "fight" ? (state.fight?.phase === "rest" ? "rest" : "active") : null;
+  state.workout.update(dt, activity);
   if (state.mode === "free" && !state.attacking) {
     state.attackTimer -= dt;
     if (state.attackTimer <= 0) freeAttack();
@@ -358,7 +420,7 @@ renderer.setAnimationLoop(() => {
   headPos.copy(opponent.group.position).setY(OPPONENT_HEIGHT + 0.25).project(camera);
   hud.opponentTag((headPos.x * 0.5 + 0.5) * window.innerWidth, (-headPos.y * 0.5 + 0.5) * window.innerHeight,
     state.mode === "fight" ? state.oppState : { guard: false, open: false });
-  hud.update(state);
+  hud.update({ ...state, workout: activity ? state.workout.sinceMark() : null });
   if (composer) composer.render(dt);
   else renderer.render(scene, camera);
 });
@@ -390,6 +452,22 @@ document.getElementById("start-keys").addEventListener("click", () => {
 });
 
 hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
+hud.setToday(todayTotal(localStorageSafe()));
+
+// น้ำหนักตัว (ใช้คำนวณแคลอรี) เก็บในเบราว์เซอร์
+const weightInput = document.getElementById("weight");
+weightInput.value = state.workout.weight;
+weightInput.addEventListener("change", () => {
+  const kg = Number(weightInput.value);
+  if (kg >= 10 && kg <= 200) {
+    state.workout.weight = kg;
+    saveWeight(localStorageSafe(), kg);
+  } else weightInput.value = state.workout.weight;
+});
+
+// เวอร์ชัน (build-site.sh ใส่ให้ตอน build; เปิดในเครื่อง = dev)
+const version = document.querySelector('meta[name="bakadot-version"]')?.content ?? "dev";
+document.getElementById("version").textContent = version === "dev" ? "BakaDot dev (local)" : `BakaDot ${version}`;
 
 // ---------- โหมดทดสอบ (?demo=free / ?demo=fight) ----------
 

@@ -1,5 +1,6 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=11c252a";
+import { PLAYER_MAX_HP } from "./fight.js?v=073660e";
+import { clock } from "./workout.js?v=073660e";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -31,11 +32,21 @@ export class Hud {
     this.root = root;
     root.innerHTML = "";
 
-    // --- เล่นอิสระ: แต้ม + นับแต่ละอาวุธ ---
+    // --- เล่นอิสระ (ซ้อม): หลอดเลือดคู่ซ้อม + น็อก/หมัด/โดนต่อย + นับแต่ละอาวุธ ---
     this.freePanel = h("div", "panel free-panel");
+    this.freeHp = h("div", "hp opp free-hp");
+    this.freeHp.fill = h("div", "hp-fill");
+    this.freeHp.trail = h("div", "hp-trail");
+    this.freeHp.wrap = this.freeHp;
+    const freeBar = h("div", "hp-bar");
+    freeBar.append(this.freeHp.trail, this.freeHp.fill);
+    this.freeHp.append(h("div", "free-title", "SPARRING"), freeBar);
     this.scoreEl = h("div", "score");
     this.countsEl = h("div", "counts");
-    this.freePanel.append(this.scoreEl, this.countsEl);
+    this.freePanel.append(this.freeHp, this.scoreEl, this.countsEl);
+
+    // --- เวลาออกกำลังกาย + แคลอรี (ระหว่างเล่น) ---
+    this.workoutEl = h("div", "workout");
 
     // --- ประลอง: HP สองฝ่าย + ยก/เวลา ---
     this.fightPanel = h("div", "fight-panel");
@@ -70,14 +81,15 @@ export class Hud {
     this.menu = this.buildMenu();
     this.result = h("div", "screen result");
 
-    root.append(this.flash, this.freePanel, this.fightPanel, this.oppTag, this.banner, this.pop,
+    root.append(this.flash, this.freePanel, this.workoutEl, this.fightPanel, this.oppTag, this.banner, this.pop,
       this.warnBox, this.msg, this.status, this.guardEl, this.menu, this.result);
     this.setMode("menu");
   }
 
   buildMenu() {
     const menu = h("div", "screen menu");
-    menu.append(h("h1", "", "BakaDot"), h("p", "sub", "Punch LEFT or RIGHT to choose"));
+    this.todayEl = h("p", "today");
+    menu.append(h("h1", "", "BakaDot"), h("p", "sub", "Punch LEFT or RIGHT to choose"), this.todayEl);
     const row = h("div", "cards");
     const card = (side, title, text) => {
       const c = h("div", `card ${side}`);
@@ -97,17 +109,24 @@ export class Hud {
     this.storyCard.lastChild.textContent = `Stage ${stage} of ${total}: ${fighter.name}, ${fighter.title}. Knock them out or win on points.`;
   }
 
+  /** Today's workout total on the menu. */
+  setToday({ seconds, kcal }) {
+    this.todayEl.textContent = seconds > 0 ? `Today: ${clock(seconds)} of exercise · ~${Math.round(kcal)} kcal` : "";
+  }
+
   setMode(mode) {
     this.mode = mode;
     this.root.dataset.mode = mode;
     this.warnBox.classList.remove("on");
   }
 
-  update({ score, counts, guarding, connected, fight }) {
+  update({ score, counts, guarding, connected, fight, free, workout }) {
     if (this.mode === "free") {
-      this.scoreEl.textContent = `STRIKES  ${score}`;
+      setHp(this.freeHp, free.hp / free.max);
+      this.scoreEl.textContent = `KO ${free.kos}   ·   STRIKES ${score}   ·   HITS TAKEN ${free.hitsTaken}`;
       this.countsEl.textContent = ORDER.map((k) => `${NAMES[k]} ${counts[k] ?? 0}`).join("   ");
     }
+    if (workout) this.workoutEl.textContent = `⏱ ${clock(workout.seconds)}    🔥 ~${Math.round(workout.kcal)} kcal`;
     if (this.mode === "fight" && fight) {
       this.youBar.name.textContent = "YOU";
       setHp(this.youBar, fight.playerHp / PLAYER_MAX_HP);
@@ -124,8 +143,13 @@ export class Hud {
     this.status.classList.toggle("ok", connected);
   }
 
-  showStrike(kind, { damage = null, open = false, blocked = false } = {}) {
+  showStrike(kind, { damage = null, open = false, blocked = false, dodged = false } = {}) {
     let text = `${NAMES[kind]}!`;
+    if (dodged) {
+      this.pop.textContent = "MISS!  (dodged)";
+      this.pop.dataset.kind = "miss";
+      return replay(this.pop, "go");
+    }
     if (damage !== null) text += blocked ? "  (blocked)" : `  -${Math.round(damage * 10) / 10}`;
     if (open) text += "  OPEN!";
     if (damage === null) text += "  +1";
@@ -175,6 +199,11 @@ export class Hud {
       h("h1", "", r.win ? "YOU WIN!" : "YOU LOSE"),
       h("p", "sub", `${r.win ? "Beat" : "Lost to"} ${r.fighter.name} by ${r.how === "KO" ? "knockout" : "decision"} · ${mins}:${secs}`),
     );
+    if (r.workout) {
+      const w = r.workout, t = r.today;
+      this.result.append(h("p", "workout-sum",
+        `⏱ ${clock(w.seconds)}  ·  🔥 ~${Math.round(w.kcal)} kcal` + (t ? `     Today: ${clock(t.seconds)} · ~${Math.round(t.kcal)} kcal` : "")));
+    }
     const stats = h("div", "stats");
     for (const [label, value] of [
       ["Punches", r.punch], ["Elbows", r.elbow], ["Knees", r.knee],
