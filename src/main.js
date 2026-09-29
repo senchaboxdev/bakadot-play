@@ -8,17 +8,17 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=2145e1a";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=2145e1a";
-import { Gloves } from "./gloves.js?v=2145e1a";
-import { Effects } from "./effects.js?v=2145e1a";
-import { GameAudio } from "./audio.js?v=2145e1a";
-import { Hud } from "./hud.js?v=2145e1a";
-import { Tweens, lerp } from "./tween.js?v=2145e1a";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=2145e1a";
-import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=2145e1a";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=2145e1a";
-import { startVision } from "./vision.js?v=2145e1a";
+import { buildArena, loadEnvironment } from "./arena.js?v=3f08d10";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=3f08d10";
+import { Gloves } from "./gloves.js?v=3f08d10";
+import { Effects } from "./effects.js?v=3f08d10";
+import { GameAudio } from "./audio.js?v=3f08d10";
+import { Hud } from "./hud.js?v=3f08d10";
+import { Tweens, lerp } from "./tween.js?v=3f08d10";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=3f08d10";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=3f08d10";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=3f08d10";
+import { startVision } from "./vision.js?v=3f08d10";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -184,13 +184,14 @@ window.addEventListener("pointerdown", (e) => {
 
 // ---------- โหมด ----------
 
-/** เก็บเวลา/แคลอรีตั้งแต่เริ่มไฟต์/ซ้อมเข้ายอดวันนี้ (คืนยอดวันนี้) */
+/** ปิดยอดของไฟต์/รอบซ้อมที่เพิ่งจบ: คืน { workout: ยอดรอบนี้, session: ยอดรวมตั้งแต่เปิดหน้าเว็บ/เลือกน้ำหนัก }
+ *  ยอดรวมไม่เก็บข้าม refresh: refresh = คนใหม่มาเล่น */
 function bankWorkout() {
   const w = state.workout.sinceMark();
   state.workout.mark();
-  const today = addToToday(localStorageSafe(), w.seconds, w.kcal);
-  hud.setToday(today);
-  return { workout: w, today };
+  const session = { seconds: state.workout.seconds, kcal: state.workout.kcal };
+  hud.setSession(session);
+  return { workout: w, session };
 }
 
 function toMenu() {
@@ -480,7 +481,6 @@ document.getElementById("start-keys").addEventListener("click", () => {
 });
 
 hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
-hud.setToday(todayTotal(localStorageSafe()));
 
 // น้ำหนักตัว (ใช้คำนวณแคลอรี): กดเลือกช่วง ใช้ค่ากลางของช่วง เก็บในเบราว์เซอร์
 const WEIGHT_RANGES = [[20, 30], [30, 40], [40, 50], [50, 60], [60, 70], [70, 80], [80, 100]];
@@ -496,8 +496,10 @@ for (const range of WEIGHT_RANGES) {
   chip.dataset.kg = mid(range);
   chip.textContent = range[1] === 100 ? `${range[0]}+` : `${range[0]}–${range[1]}`;
   chip.addEventListener("click", () => {
-    state.workout.weight = mid(range);
+    // เลือกน้ำหนัก = คนใหม่: เริ่มนับเวลา/แคลอรีใหม่
+    state.workout = new Workout(mid(range));
     saveWeight(localStorageSafe(), state.workout.weight);
+    hud.setSession(state.workout);
     showWeight();
   });
   weightChips.append(chip);

@@ -1,6 +1,6 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=2145e1a";
-import { clock } from "./workout.js?v=2145e1a";
+import { PLAYER_MAX_HP } from "./fight.js?v=3f08d10";
+import { clock } from "./workout.js?v=3f08d10";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -88,8 +88,8 @@ export class Hud {
 
   buildMenu() {
     const menu = h("div", "screen menu");
-    this.todayEl = h("p", "today");
-    menu.append(h("h1", "", "BakaDot"), h("p", "sub", "Punch LEFT or RIGHT to choose"), this.todayEl);
+    this.sessionEl = h("p", "today");
+    menu.append(h("h1", "", "BakaDot"), h("p", "sub", "Punch LEFT or RIGHT to choose"), this.sessionEl);
     const row = h("div", "cards");
     const card = (side, title, text) => {
       const c = h("div", `card ${side}`);
@@ -109,9 +109,9 @@ export class Hud {
     this.storyCard.lastChild.textContent = `Stage ${stage} of ${total}: ${fighter.name}, ${fighter.title}. Knock them out or win on points.`;
   }
 
-  /** Today's workout total on the menu. */
-  setToday({ seconds, kcal }) {
-    this.todayEl.textContent = seconds > 0 ? `Today: ${clock(seconds)} of exercise · ~${Math.round(kcal)} kcal` : "";
+  /** This player's total so far (since the page opened or the weight was picked), on the menu. */
+  setSession({ seconds, kcal }) {
+    this.sessionEl.textContent = seconds > 0 ? `This session: ${clock(seconds)} of exercise · ~${Math.round(kcal)} kcal` : "";
   }
 
   setMode(mode) {
@@ -200,9 +200,9 @@ export class Hud {
       h("p", "sub", `${r.win ? "Beat" : "Lost to"} ${r.fighter.name} by ${r.how === "KO" ? "knockout" : "decision"} · ${mins}:${secs}`),
     );
     if (r.workout) {
-      const w = r.workout, t = r.today;
+      const w = r.workout, t = r.session;
       this.result.append(h("p", "workout-sum",
-        `⏱ ${clock(w.seconds)}  ·  🔥 ~${Math.round(w.kcal)} kcal` + (t ? `     Today: ${clock(t.seconds)} · ~${Math.round(t.kcal)} kcal` : "")));
+        `⏱ ${clock(w.seconds)}  ·  🔥 ~${Math.round(w.kcal)} kcal` + (t ? `     This session: ${clock(t.seconds)} · ~${Math.round(t.kcal)} kcal` : "")));
     }
     const stats = h("div", "stats");
     for (const [label, value] of [

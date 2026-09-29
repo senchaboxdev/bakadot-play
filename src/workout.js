@@ -34,30 +34,10 @@ export const clock = (seconds) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
-// ---------- ยอดรวมรายวัน (เก็บในเบราว์เซอร์) ----------
+// ---------- น้ำหนักตัว (เก็บในเบราว์เซอร์) ----------
+// เวลา/แคลอรีไม่เก็บข้าม refresh (refresh = คนใหม่มาเล่น)
 
-const DAY_KEY = "bakadot.days";
 const WEIGHT_KEY = "bakadot.weight";
-const today = () => new Date().toLocaleDateString("sv"); // YYYY-MM-DD ตามเวลาเครื่อง
-
-function readDays(storage) {
-  try { return JSON.parse(storage.getItem(DAY_KEY)) ?? {}; } catch { return {}; }
-}
-
-/** เพิ่มเวลา/แคลอรีเข้ายอดของวันนี้ แล้วคืนยอดวันนี้ */
-export function addToToday(storage, seconds, kcal) {
-  const days = readDays(storage);
-  const d = days[today()] ?? { seconds: 0, kcal: 0 };
-  d.seconds += seconds;
-  d.kcal += kcal;
-  days[today()] = d;
-  try { storage.setItem(DAY_KEY, JSON.stringify(days)); } catch { /* private mode: not kept */ }
-  return d;
-}
-
-export function todayTotal(storage) {
-  return readDays(storage)[today()] ?? { seconds: 0, kcal: 0 };
-}
 
 export function loadWeight(storage) {
   try {
