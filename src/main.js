@@ -8,17 +8,17 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=073660e";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=073660e";
-import { Gloves } from "./gloves.js?v=073660e";
-import { Effects } from "./effects.js?v=073660e";
-import { GameAudio } from "./audio.js?v=073660e";
-import { Hud } from "./hud.js?v=073660e";
-import { Tweens, lerp } from "./tween.js?v=073660e";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=073660e";
-import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=073660e";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=073660e";
-import { startVision } from "./vision.js?v=073660e";
+import { buildArena, loadEnvironment } from "./arena.js?v=b24b321";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=b24b321";
+import { Gloves } from "./gloves.js?v=b24b321";
+import { Effects } from "./effects.js?v=b24b321";
+import { GameAudio } from "./audio.js?v=b24b321";
+import { Hud } from "./hud.js?v=b24b321";
+import { Tweens, lerp } from "./tween.js?v=b24b321";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=b24b321";
+import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=b24b321";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=b24b321";
+import { startVision } from "./vision.js?v=b24b321";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -34,6 +34,8 @@ const STRIKE_TYPES = {
 // เล่นอิสระ = ซ้อมกับคู่ซ้อม: ต่อยจนหมดหลอด = น็อก แล้วลุกขึ้นมาใหม่
 const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, hp: 40, dodgeChance: 0.12, getUp: 2.8, shorts: "#c62828" };
 const DODGE_COOLDOWN = 1.0;
+const MENU_LOCK = 1.0; // วินาที
+const startScreenShown = () => !document.getElementById("start").hidden;
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
 const OUT_TIME = 0.08; // นวมพุ่งออก
 const BACK_TIME = 0.15; // นวมดึงกลับ
@@ -133,6 +135,7 @@ const state = {
   stage: loadStage(),
   oppState: { guard: false, open: false },
   shake: 0,
+  menuLock: 0, // วินาทีที่เมนูยังไม่รับการเลือก (หลังเพิ่งเข้าเมนู)
 };
 
 // warm the cache for the stage the player is about to fight while they read the menu (the rest load on demand)
@@ -147,6 +150,7 @@ function onAction(action) {
   if (action === "guard_off") return void (state.guarding = false);
   if (!(action in STRIKE_TYPES) || state.mode === "loading") return;
   if (state.mode === "menu") {
+    if (startScreenShown() || state.menuLock > 0) return; // ยังอยู่หน้าเริ่ม / เพิ่งเข้าเมนู: กันหมัดที่ไม่ได้ตั้งใจ
     if (action === "punch_left") startFree();
     else if (action === "punch_right") startFight(STAGES[state.stage]);
   } else if (state.mode === "result") {
@@ -167,6 +171,8 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => { if (e.key === "g") onAction("guard_off"); });
 window.addEventListener("pointerdown", (e) => {
   // เมนู/สรุปผล: แตะครึ่งซ้าย/ขวาของจอ = เหมือนต่อยซ้าย/ขวา
+  // (ไม่นับคลิกบนหน้าจอเริ่ม เช่นปุ่ม Start ไม่อย่างนั้นจะเลือกโหมดไปเลย)
+  if (startScreenShown() || e.target.closest?.("#start")) return;
   if (state.mode === "menu" || state.mode === "result") {
     onAction(e.clientX < window.innerWidth / 2 ? "punch_left" : "punch_right");
   }
@@ -186,6 +192,7 @@ function bankWorkout() {
 function toMenu() {
   if (state.mode === "free" || state.mode === "fight") bankWorkout();
   state.mode = "menu";
+  state.menuLock = MENU_LOCK;
   state.fight = null;
   state.oppState = { guard: false, open: false };
   hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
@@ -399,6 +406,7 @@ renderer.setAnimationLoop(() => {
 
   if (state.mode === "fight") state.fight?.update(dt);
   state.free.dodgeWait = Math.max(state.free.dodgeWait - dt, 0);
+  state.menuLock = Math.max(state.menuLock - dt, 0);
   // นับเวลาออกกำลังกาย: สู้/ซ้อม = active, พักระหว่างยก = rest, เมนู/สรุปผล = ไม่นับ
   const activity = state.mode === "free" ? "active"
     : state.mode === "fight" ? (state.fight?.phase === "rest" ? "rest" : "active") : null;
@@ -438,6 +446,7 @@ startButton.addEventListener("click", async () => {
   try {
     await startVision(onAction);
     start.hidden = true;
+    state.menuLock = MENU_LOCK;
   } catch (err) {
     console.error(err);
     startButton.disabled = false;
@@ -449,6 +458,7 @@ startButton.addEventListener("click", async () => {
 document.getElementById("start-keys").addEventListener("click", () => {
   audio.resume();
   start.hidden = true;
+  state.menuLock = MENU_LOCK;
 });
 
 hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);

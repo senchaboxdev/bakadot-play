@@ -2,7 +2,7 @@
 // action: "punch_left", "elbow_right", "knee_left", "guard_on", "guard_off", "camera_on"
 // ภาพจากกล้องประมวลผลในเครื่องนี้เท่านั้น
 import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
-import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=073660e";
+import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=b24b321";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
 const MODEL_URL = "models/pose_landmarker_full.task";
