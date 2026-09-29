@@ -8,17 +8,17 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=b24b321";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=b24b321";
-import { Gloves } from "./gloves.js?v=b24b321";
-import { Effects } from "./effects.js?v=b24b321";
-import { GameAudio } from "./audio.js?v=b24b321";
-import { Hud } from "./hud.js?v=b24b321";
-import { Tweens, lerp } from "./tween.js?v=b24b321";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=b24b321";
-import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=b24b321";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=b24b321";
-import { startVision } from "./vision.js?v=b24b321";
+import { buildArena, loadEnvironment } from "./arena.js?v=2847e0b";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=2847e0b";
+import { Gloves } from "./gloves.js?v=2847e0b";
+import { Effects } from "./effects.js?v=2847e0b";
+import { GameAudio } from "./audio.js?v=2847e0b";
+import { Hud } from "./hud.js?v=2847e0b";
+import { Tweens, lerp } from "./tween.js?v=2847e0b";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=2847e0b";
+import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=2847e0b";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=2847e0b";
+import { startVision } from "./vision.js?v=2847e0b";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -35,6 +35,7 @@ const STRIKE_TYPES = {
 const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, hp: 40, dodgeChance: 0.12, getUp: 2.8, shorts: "#c62828" };
 const DODGE_COOLDOWN = 1.0;
 const MENU_LOCK = 1.0; // วินาที
+const RESULT_LOCK = 1.5; // วินาที หลังหน้าสรุปผลขึ้น
 const startScreenShown = () => !document.getElementById("start").hidden;
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
 const OUT_TIME = 0.08; // นวมพุ่งออก
@@ -154,6 +155,7 @@ function onAction(action) {
     if (action === "punch_left") startFree();
     else if (action === "punch_right") startFight(STAGES[state.stage]);
   } else if (state.mode === "result") {
+    if (state.menuLock > 0) return; // หน้าสรุปยังไม่ขึ้น/เพิ่งขึ้น: หมัดที่ยังต่อยค้างไม่นับ
     if (action === "punch_left") toMenu();
     else if (action === "punch_right") startFight(STAGES[state.stage]);
   } else {
@@ -243,6 +245,7 @@ async function startFight(id, overrides = {}) {
 async function onFightFinished(r) {
   Object.assign(r, bankWorkout());
   state.mode = "result";
+  state.menuLock = 99; // ไม่รับหมัดระหว่างป้าย K.O. จนหน้าสรุปขึ้น (ตั้งใหม่ด้านล่าง)
   const last = state.stage === STAGES.length - 1;
   if (r.win) {
     // win: next stage next time (after the last one, start over from stage 1)
@@ -262,7 +265,10 @@ async function onFightFinished(r) {
     hud.showBanner(r.how === "KO" ? "K.O." : "YOU LOSE", "#ff5252", 1.8);
   }
   await tweens.wait(1.9);
-  if (state.mode === "result") hud.showResult(r);
+  if (state.mode === "result") {
+    hud.showResult(r);
+    state.menuLock = RESULT_LOCK;
+  }
 }
 
 // ---------- ผู้เล่นออกอาวุธ ----------
