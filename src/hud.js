@@ -1,6 +1,7 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=3f08d10";
-import { clock } from "./workout.js?v=3f08d10";
+import { PLAYER_MAX_HP } from "./fight.js?v=07d1cee";
+import { clock } from "./workout.js?v=07d1cee";
+import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=07d1cee";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -171,7 +172,9 @@ export class Hud {
     replay(this.msg, "go");
   }
 
-  hitFlash() {
+  /** แฟลชเต็มจอ: แดง = โดนต่อย, "white" = แฟลชกล้องตอนถ่ายรูป */
+  hitFlash(color) {
+    this.flash.style.background = color === "white" ? "rgba(255, 255, 255, 0.9)" : "";
     replay(this.flash, "go");
   }
 
@@ -195,14 +198,17 @@ export class Hud {
     const secs = String(Math.floor(r.time % 60)).padStart(2, "0");
     this.result.innerHTML = "";
     this.result.classList.toggle("win", r.win);
-    this.result.append(
+    this.result.classList.toggle("with-card", Boolean(r.card));
+    // ข้อมูลผล (ถ้ามีใบผลงาน: ใบอยู่ซ้าย ข้อมูลอยู่ขวา)
+    const info = h("div", "result-info");
+    info.append(
       h("h1", "", r.win ? "YOU WIN!" : "YOU LOSE"),
       h("p", "sub", `${r.win ? "Beat" : "Lost to"} ${r.fighter.name} by ${r.how === "KO" ? "knockout" : "decision"} · ${mins}:${secs}`),
     );
     if (r.workout) {
       const w = r.workout, t = r.session;
-      this.result.append(h("p", "workout-sum",
-        `⏱ ${clock(w.seconds)}  ·  🔥 ~${Math.round(w.kcal)} kcal` + (t ? `     This session: ${clock(t.seconds)} · ~${Math.round(t.kcal)} kcal` : "")));
+      info.append(h("p", "workout-sum",
+        `⏱ ${clock(w.seconds)}  ·  🔥 ~${Math.round(w.kcal)} kcal` + (t ? `\nThis session: ${clock(t.seconds)} · ~${Math.round(t.kcal)} kcal` : "")));
     }
     const stats = h("div", "stats");
     for (const [label, value] of [
@@ -213,18 +219,53 @@ export class Hud {
       s.append(h("b", "", String(value)), h("span", "", label));
       stats.append(s);
     }
-    this.result.append(stats);
-    if (!r.win && r.fighter.hint) this.result.append(h("p", "hint", `Tip: ${r.fighter.hint}`));
-    if (r.champion) this.result.append(h("p", "sub", "You beat every fighter. You are the champion!"));
-    else if (r.next) this.result.append(h("p", "sub", `Next: ${r.next.name} · ${r.next.title}`));
+    info.append(stats);
+    if (!r.win && r.fighter.hint) info.append(h("p", "hint", `Tip: ${r.fighter.hint}`));
+    if (r.champion) info.append(h("p", "sub", "You beat every fighter. You are the champion!"));
+    else if (r.next) info.append(h("p", "sub", `Next: ${r.next.name} · ${r.next.title}`));
+    if (r.card) {
+      const { img, side } = this.photoCard(r.card, r.onPhotoAction);
+      info.append(side);
+      this.result.append(img);
+    }
     const again = r.win ? (r.champion ? "Play again from stage 1" : "Next fight") : "Try again";
     this.choicesEl = h("p", "choices", `◀ Punch LEFT: Menu        Punch RIGHT: ${again} ▶`);
-    this.result.append(this.choicesEl);
+    info.append(this.choicesEl);
+    this.result.append(info);
     this.setMode("result");
+  }
+
+  /** ใบผลงาน (ภาพคนเล่น + ด่านที่ไปถึง) + ปุ่ม Save photo / Share; onAction = กดปุ่มใดปุ่มหนึ่ง */
+  photoCard(blob, onAction = () => {}) {
+    const img = h("img", "card-img");
+    img.src = URL.createObjectURL(blob);
+    img.alt = "BakaDot result card with the player's photo";
+    const actions = h("div", "card-actions");
+    const note = h("p", "card-note", "The photo stays on this device until you save or share it.");
+    const save = h("button", "action", "💾 Save photo");
+    save.type = "button";
+    save.addEventListener("click", () => { onAction(); savePhoto(blob); });
+    actions.append(save);
+    if (canShareFiles()) {
+      const share = h("button", "action share", "📤 Share");
+      share.type = "button";
+      share.addEventListener("click", async () => {
+        onAction();
+        try { await sharePhoto(blob); } catch (err) { note.textContent = `Could not share: ${err.message}`; }
+      });
+      actions.append(share);
+    } else {
+      note.textContent += " This browser cannot share files: save the photo, then send it by email.";
+    }
+    const side = h("div", "card-side");
+    side.append(actions, note);
+    return { img, side };
   }
 
   /** Result screen after a win: counting down to the next fight (it starts by itself). */
   nextFightIn(seconds) {
-    this.choicesEl.textContent = `◀ Punch LEFT: Menu        Next fight in ${Math.ceil(seconds)}… ▶`;
+    this.choicesEl.textContent = seconds > 0
+      ? `◀ Punch LEFT: Menu        Next fight in ${Math.ceil(seconds)}… ▶`
+      : "◀ Punch LEFT: Menu        Punch RIGHT: Next fight ▶";
   }
 }

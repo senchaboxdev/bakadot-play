@@ -3,7 +3,7 @@
 // ทำหน้าที่เดียวกับ vision/pose_viewer.py + vision/action_server.py ในเวอร์ชันเดสก์ท็อป
 
 import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
-import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=3f08d10";
+import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=07d1cee";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
 const MODEL_URL = "models/pose_landmarker_full.task";

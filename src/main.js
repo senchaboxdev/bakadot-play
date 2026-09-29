@@ -8,17 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=3f08d10";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=3f08d10";
-import { Gloves } from "./gloves.js?v=3f08d10";
-import { Effects } from "./effects.js?v=3f08d10";
-import { GameAudio } from "./audio.js?v=3f08d10";
-import { Hud } from "./hud.js?v=3f08d10";
-import { Tweens, lerp } from "./tween.js?v=3f08d10";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=3f08d10";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=3f08d10";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=3f08d10";
-import { startVision } from "./vision.js?v=3f08d10";
+import { buildArena, loadEnvironment } from "./arena.js?v=07d1cee";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=07d1cee";
+import { Gloves } from "./gloves.js?v=07d1cee";
+import { Effects } from "./effects.js?v=07d1cee";
+import { GameAudio } from "./audio.js?v=07d1cee";
+import { Hud } from "./hud.js?v=07d1cee";
+import { Tweens, lerp } from "./tween.js?v=07d1cee";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=07d1cee";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=07d1cee";
+import { capturePhoto, makeCard } from "./champion.js?v=07d1cee";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=07d1cee";
+import { startVision } from "./vision.js?v=07d1cee";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -36,7 +37,7 @@ const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, hp: 40, dodgeChance: 0.12, ge
 const DODGE_COOLDOWN = 1.0;
 const MENU_LOCK = 1.0; // วินาที
 const RESULT_LOCK = 1.5; // วินาที หลังหน้าสรุปผลขึ้น
-const NEXT_FIGHT_IN = 5; // ชนะแล้ว: นับถอยหลังแล้วไปไฟต์ต่อไปเอง (ต่อยซ้าย = กลับเมนู)
+const NEXT_FIGHT_IN = 6; // ชนะแล้ว: นับถอยหลังแล้วไปไฟต์ต่อไปเอง (ต่อยซ้าย = กลับเมนู, กด Save/Share = หยุดนับ)
 const startScreenShown = () => !document.getElementById("start").hidden;
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
 const OUT_TIME = 0.08; // นวมพุ่งออก
@@ -117,7 +118,7 @@ function loadStage() {
 /** Fighter data for stage i (0-based), with the stage number in its title. */
 function stageFighter(i) {
   const f = FIGHTERS[STAGES[i]];
-  return { ...f, title: `Stage ${i + 1} · ${f.title}` };
+  return { ...f, stage: i + 1, title: `Stage ${i + 1} · ${f.title}` };
 }
 function saveStage(i) {
   try { localStorage.setItem(SAVE_KEY, String(i)); } catch { /* private mode: progress just isn't kept */ }
@@ -176,7 +177,7 @@ window.addEventListener("keyup", (e) => { if (e.key === "g") onAction("guard_off
 window.addEventListener("pointerdown", (e) => {
   // เมนู/สรุปผล: แตะครึ่งซ้าย/ขวาของจอ = เหมือนต่อยซ้าย/ขวา
   // (ไม่นับคลิกบนหน้าจอเริ่ม เช่นปุ่ม Start ไม่อย่างนั้นจะเลือกโหมดไปเลย)
-  if (startScreenShown() || e.target.closest?.("#start")) return;
+  if (startScreenShown() || e.target.closest?.("#start, button, a")) return; // ปุ่ม (เช่น Save photo) ไม่ใช่การเลือก
   if (state.mode === "menu" || state.mode === "result") {
     onAction(e.clientX < window.innerWidth / 2 ? "punch_left" : "punch_right");
   }
@@ -268,7 +269,9 @@ async function onFightFinished(r) {
     hud.showBanner(r.how === "KO" ? "K.O." : "YOU LOSE", "#ff5252", 1.8);
   }
   await tweens.wait(1.9);
+  if (state.mode === "result") r.card = await resultPhoto(r);
   if (state.mode === "result") {
+    r.onPhotoAction = () => { state.nextFight = 0; hud.nextFightIn(0); }; // กำลังแชร์: ไม่ข้ามไปไฟต์ต่อไปเอง
     hud.showResult(r);
     state.menuLock = RESULT_LOCK;
     if (r.win && !r.champion) {
@@ -363,6 +366,27 @@ async function opponentAttack(warn, onImpact) {
   state.attacking = false;
 }
 
+/** จบไฟต์ (แพ้หรือชนะ): นับ 3-2-1 ถ่ายภาพจากกล้อง แล้วทำใบผลงานบอกด่านที่ไปถึง (ภาพอยู่ในเครื่องเท่านั้น) */
+async function resultPhoto(r) {
+  for (const text of ["PHOTO!", "3", "2", "1"]) {
+    hud.showBanner(text, "#ffd400", 0.75);
+    await tweens.wait(0.75);
+  }
+  renderFrame(); // ให้ภาพเกมล่าสุดอยู่บน canvas ตอนหยิบ (กรณีไม่ได้เปิดกล้อง)
+  const photo = capturePhoto(document.querySelector("#cam video"), renderer.domElement);
+  hud.hitFlash("white");
+  audio.play("block");
+  return makeCard(photo, {
+    stage: r.fighter.stage,
+    stages: STAGES.length,
+    win: r.win,
+    champion: r.champion,
+    opponent: r.fighter.name,
+    session: r.session ?? { seconds: state.workout.seconds, kcal: state.workout.kcal },
+    fight: { punch: r.punch ?? 0, elbow: r.elbow ?? 0, knee: r.knee ?? 0 },
+  });
+}
+
 async function sparringKO() {
   const f = state.free;
   f.down = true;
@@ -448,9 +472,13 @@ renderer.setAnimationLoop(() => {
   hud.opponentTag((headPos.x * 0.5 + 0.5) * window.innerWidth, (-headPos.y * 0.5 + 0.5) * window.innerHeight,
     state.mode === "fight" ? state.oppState : { guard: false, open: false });
   hud.update({ ...state, workout: activity ? state.workout.sinceMark() : null });
+  renderFrame(dt);
+});
+
+function renderFrame(dt = 0.016) {
   if (composer) composer.render(dt);
   else renderer.render(scene, camera);
-});
+}
 
 // ---------- หน้าจอเริ่ม ----------
 
@@ -530,6 +558,11 @@ async function runDemo(kind) {
       [0.3, "knee_left"], [0.5, "elbow_right"], [0.5, "punch_left"]]) await act(s, a);
     await tweens.wait(6);
     for (let i = 0; i < 8; i++) await act(0.35, i % 2 ? "knee_right" : "knee_left");
+  } else if (kind === "champion") { // ดูหน้าแชมป์: ชนะด่านสุดท้ายทันที
+    state.stage = STAGES.length - 1;
+    await startFight(STAGES[state.stage]);
+    await tweens.wait(2.5);
+    state.fight.finish(true, "KO");
   } else {
     startFree();
     state.attackTimer = 1.0;
