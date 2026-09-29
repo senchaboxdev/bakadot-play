@@ -4,16 +4,20 @@
 // - fight: การประลองจริงกับยอดฝีมือ (ตรรกะใน fight.js, ข้อมูลใน data/fighters.js)
 // ทดสอบโดยไม่ใช้กล้อง: ?demo=free หรือ ?demo=fight (เล่นท่าอัตโนมัติ) หรือกดคีย์บอร์ด
 import * as THREE from "three";
-import { buildArena, loadEnvironment } from "./arena.js?v=5f1590a";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=5f1590a";
-import { Gloves } from "./gloves.js?v=5f1590a";
-import { Effects } from "./effects.js?v=5f1590a";
-import { GameAudio } from "./audio.js?v=5f1590a";
-import { Hud } from "./hud.js?v=5f1590a";
-import { Tweens, lerp } from "./tween.js?v=5f1590a";
-import { Fight } from "./fight.js?v=5f1590a";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=5f1590a";
-import { startVision } from "./vision.js?v=5f1590a";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { buildArena, loadEnvironment } from "./arena.js?v=11c252a";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=11c252a";
+import { Gloves } from "./gloves.js?v=11c252a";
+import { Effects } from "./effects.js?v=11c252a";
+import { GameAudio } from "./audio.js?v=11c252a";
+import { Hud } from "./hud.js?v=11c252a";
+import { Tweens, lerp } from "./tween.js?v=11c252a";
+import { Fight } from "./fight.js?v=11c252a";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=11c252a";
+import { startVision } from "./vision.js?v=11c252a";
 
 const STRIKE_TYPES = {
   punch_left: "punch", punch_right: "punch",
@@ -23,16 +27,18 @@ const STRIKE_TYPES = {
 };
 const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, penalty: 5, shorts: "#c62828" };
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
-const PUNCH_LEAD = 0.35; // เริ่มท่าชกก่อนหมัดถึงเท่านี้ (วินาที)
 const OUT_TIME = 0.08; // นวมพุ่งออก
 const BACK_TIME = 0.15; // นวมดึงกลับ
 
 // ---------- ฉาก ----------
 
 const stage = document.getElementById("stage");
+// ?lite=1: no glow (bloom) and no soft shadows, for slow computers
+const LITE = new URLSearchParams(location.search).has("lite");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = LITE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 stage.append(renderer.domElement);
 
@@ -43,16 +49,27 @@ camera.position.copy(CAMERA_HOME);
 camera.rotation.x = THREE.MathUtils.degToRad(-10);
 scene.add(camera);
 
+// แสงเรือง (bloom) รอบไฟ/ป้ายไฟ/เอฟเฟกต์ แล้วค่อยปรับโทนสีตอนท้าย (OutputPass)
+let composer = null;
+if (!LITE) {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.45, 1.15));
+  composer.addPass(new OutputPass());
+}
+
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer?.setSize(window.innerWidth, window.innerHeight);
+  composer?.setPixelRatio(renderer.getPixelRatio());
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
 resize();
 
-buildArena(scene);
-loadEnvironment(scene, renderer); // optional HDRI backdrop; the plain one stays if the file is missing
+const arena = buildArena(scene, renderer);
+loadEnvironment(scene, renderer); // ?env=file.hdr swaps in an HDRI backdrop; otherwise the built-in arena
 const tweens = new Tweens();
 const fx = new Effects(scene);
 const audio = new GameAudio();
@@ -110,6 +127,7 @@ const state = {
 
 // warm the cache for the stage the player is about to fight while they read the menu (the rest load on demand)
 loadOpponent(FIGHTERS[STAGES[loadStage()]].model);
+arena.setVenue(FIGHTERS[STAGES[state.stage]].venue);
 
 // ---------- รับคำสั่ง (กล้อง / คีย์บอร์ด / เมาส์) ----------
 
@@ -151,6 +169,7 @@ function toMenu() {
   state.fight = null;
   state.oppState = { guard: false, open: false };
   hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
+  arena.setVenue(FIGHTERS[STAGES[state.stage]].venue); // เมนูโชว์ฉากของด่านที่จะไป
   hud.setMode("menu");
   opponent.reset();
 }
@@ -164,13 +183,19 @@ function startFree() {
   state.oppState = { guard: false, open: false };
   opponent.reset();
   opponent.setShorts(FREE.shorts);
+  arena.setVenue("stadium");
   hud.setMode("free");
 }
 
+// ?model=key puts any model from OPPONENT_MODELS in the ring (to preview new characters)
+const PREVIEW_MODEL = new URLSearchParams(location.search).get("model");
+
 async function startFight(id, overrides = {}) {
   const fighter = { ...stageFighter(STAGES.indexOf(id)), ...overrides };
+  if (PREVIEW_MODEL in OPPONENT_MODELS) fighter.model = PREVIEW_MODEL;
   state.mode = "loading";
   await showOpponent(fighter.model);
+  arena.setVenue(fighter.venue);
   state.mode = "fight";
   opponent.setShorts(fighter.shorts);
   hud.setMode("fight");
@@ -201,6 +226,7 @@ async function onFightFinished(r) {
       audio.play("heavy");
     }
     hud.showBanner(r.how === "KO" ? "K.O.!" : "YOU WIN!", "#ffd400", 1.8);
+    arena.cheer(1);
   } else {
     hud.showBanner(r.how === "KO" ? "K.O." : "YOU LOSE", "#ff5252", 1.8);
   }
@@ -232,6 +258,7 @@ function strike(action) {
     hitReaction(side, kind);
     audio[kind === "punch" ? "hit" : "play"]("heavy");
     fx.impact(kind, side, opponent.group.position);
+    arena.cheer(kind === "punch" ? 0.3 : 0.5);
   };
   if (kind === "punch") {
     tweens.to(OUT_TIME, (p) => (gloves.out[side] = p)).then(() => {
@@ -268,9 +295,10 @@ async function opponentAttack(warn, onImpact) {
   audio.play("warn", 1);
   const z0 = opponent.home.z;
   tweens.to(warn * 0.6, (p) => (opponent.group.position.z = lerp(z0, z0 + STEP_IN, p)));
-  await tweens.wait(Math.max(warn - PUNCH_LEAD, 0.05));
-  opponent.play(`Punch_${side}`, { loop: false, fade: 0.1 });
-  await tweens.wait(PUNCH_LEAD);
+  const lead = opponent.punchLead; // เริ่มท่าชกก่อนหมัดถึงเท่านี้ (วินาที)
+  await tweens.wait(Math.max(warn - lead, 0.05));
+  opponent.play(`Punch_${side}`, { loop: false, fade: 0.05 });
+  await tweens.wait(lead);
   onImpact();
   await tweens.to(0.5, (p) => (opponent.group.position.z = lerp(z0 + STEP_IN, z0, p)));
   state.attacking = false;
@@ -309,6 +337,7 @@ renderer.setAnimationLoop(() => {
   tweens.update(dt);
   opponent.update(dt);
   fx.update(dt);
+  arena.update(dt);
   gloves.update(dt, state.guarding);
 
   if (state.mode === "fight") state.fight?.update(dt);
@@ -330,7 +359,8 @@ renderer.setAnimationLoop(() => {
   hud.opponentTag((headPos.x * 0.5 + 0.5) * window.innerWidth, (-headPos.y * 0.5 + 0.5) * window.innerHeight,
     state.mode === "fight" ? state.oppState : { guard: false, open: false });
   hud.update(state);
-  renderer.render(scene, camera);
+  if (composer) composer.render(dt);
+  else renderer.render(scene, camera);
 });
 
 // ---------- หน้าจอเริ่ม ----------

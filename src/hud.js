@@ -1,5 +1,5 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=5f1590a";
+import { PLAYER_MAX_HP } from "./fight.js?v=11c252a";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -19,6 +19,13 @@ const replay = (el, cls, seconds) => {
   el.classList.add(cls);
 };
 
+function setHp(bar, frac) {
+  const w = `${Math.max(0, Math.min(1, frac)) * 100}%`;
+  bar.fill.style.width = w;
+  bar.trail.style.width = w;
+  bar.wrap.classList.toggle("low", frac <= 0.3);
+}
+
 export class Hud {
   constructor(root) {
     this.root = root;
@@ -36,14 +43,18 @@ export class Hud {
       const wrap = h("div", `hp ${side}`);
       const name = h("div", "hp-name");
       const outer = h("div", "hp-bar");
+      const trail = h("div", "hp-trail"); // ดาเมจที่เพิ่งโดน: ลดตามหลังแถบจริงช้าๆ
       const fill = h("div", "hp-fill");
-      outer.append(fill);
-      wrap.append(name, outer);
-      return { wrap, name, fill };
+      outer.append(trail, fill);
+      wrap.append(outer, name);
+      return { wrap, name, fill, trail };
     };
     this.youBar = bar("you");
     this.oppBar = bar("opp");
     this.roundEl = h("div", "round");
+    this.roundLabel = h("div", "round-label");
+    this.clockEl = h("div", "round-clock");
+    this.roundEl.append(this.roundLabel, this.clockEl);
     this.fightPanel.append(this.youBar.wrap, this.roundEl, this.oppBar.wrap);
 
     this.banner = h("div", "banner");
@@ -99,15 +110,17 @@ export class Hud {
     }
     if (this.mode === "fight" && fight) {
       this.youBar.name.textContent = "YOU";
-      this.youBar.fill.style.width = `${(100 * fight.playerHp) / PLAYER_MAX_HP}%`;
+      setHp(this.youBar, fight.playerHp / PLAYER_MAX_HP);
       this.oppBar.name.textContent = `${fight.f.name} · ${fight.f.title}`;
-      this.oppBar.fill.style.width = `${(100 * fight.oppHp) / fight.oppMax}%`;
+      setHp(this.oppBar, fight.oppHp / fight.oppMax);
       const t = Math.ceil(fight.timeLeft);
       const clock = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
-      this.roundEl.textContent = fight.phase === "rest" ? `REST  ${clock}` : `ROUND ${fight.round}/${fight.f.rounds}  ${clock}`;
+      this.roundLabel.textContent = fight.phase === "rest" ? "REST" : `ROUND ${fight.round}/${fight.f.rounds}`;
+      this.clockEl.textContent = clock;
+      this.roundEl.classList.toggle("rest", fight.phase === "rest");
     }
     this.guardEl.classList.toggle("on", guarding && (this.mode === "free" || this.mode === "fight"));
-    this.status.textContent = connected ? "Camera: connected" : "Camera: off  (keys: J/K punch · E elbow · N knee · hold G guard)";
+    this.status.textContent = connected ? "Camera connected" : "Camera off · keys: J/K punch · E elbow · N knee · hold G guard";
     this.status.classList.toggle("ok", connected);
   }
 

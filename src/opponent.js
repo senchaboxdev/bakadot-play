@@ -9,37 +9,51 @@ const PRAJIOUD = { bones: ["UpperArm.L", "UpperArm.R"], offset: 0.13, radius: 0.
 
 const clipName = (name) => name.split("|").pop(); // "CharacterArmature|Idle" -> "Idle"
 
-// Models whose clips differ from ours (Mixamo exports: one clip each). Map our clip names onto theirs:
-// a string is a clip name, { clip, freeze } holds that clip still at time `freeze` (a fighting stance).
-// Any clip we do not map is faked on the body group (see proceduralPose): hit recoil, lunge, fall.
+// Mixamo characters (web/tools/fbx_to_glb.py): one "Punching" clip each. `auto` finds, when the model
+// loads, where each hand is furthest forward in that clip and cuts a short Punch_Left / Punch_Right around it
+// (played fast: the fist lands PUNCH_PEAK s after the move starts, with a lunge toward the player);
+// the stance with both hands closest in is Idle.
+// Clips we do not have are faked on the body group (see proceduralPose): hit recoil, fall.
 // No Muay Thai dressing (no shorts, mongkol, armbands).
-// Low-Poly Dungeon Kit rig (Woshi Gang Studio): one clip per move, hit/death included.
-const DUNGEON_CLIPS = {
-  Idle: "Idle_Loop", Punch_L: "Punch_Jab", Punch_R: "Punch_Jab",
-  HitRecieve: "Hit_Chest", HitRecieve_2: "Hit_Head", Death: "Death01",
-};
-const MIXAMO_FIGHTER = { Idle: { clip: "Punching", freeze: 0.2 }, Punch_L: "Punching", Punch_R: "Punching" };
+export const PUNCH_PEAK = 0.25; // seconds from the start of a Mixamo punch to the fist landing
+const WINDUP = 0.4; // clip seconds of wind-up before the fist lands (played in PUNCH_PEAK: 1.6x speed)
+const MIXAMO_FIGHTER = { auto: "Punching" };
+const mixamo = (file) => ({ url: `assets/opponents/${file}.glb`, clips: MIXAMO_FIGHTER });
+// key -> model. The number is the source file "fbx/Punching (N).fbx".
 export const OPPONENT_MODELS = {
   boxer: { url: "assets/boxer/MuayThai.glb" },
-  skeleton: { url: "assets/opponents/enemy_skeleton.glb", clips: DUNGEON_CLIPS },
-  warrior: { url: "assets/opponents/hero_warrior.glb", clips: DUNGEON_CLIPS },
-  villager: { url: "assets/opponents/npc_villager.glb", clips: DUNGEON_CLIPS },
-  maria: { url: "assets/opponents/maria.glb", clips: MIXAMO_FIGHTER },
-  bear: { url: "assets/opponents/bear.glb", clips: MIXAMO_FIGHTER },
-  // dances instead of standing; the dance faces sideways, so turn the model a quarter to face the player
-  goblin: { url: "assets/opponents/goblin.glb", clips: { Idle: "Dance" }, turn: Math.PI / 2 },
+  armor_girl: mixamo("mx01"), // golden armour, blonde
+  crystal_ogre: mixamo("mx02"), // big ogre with a crystal shoulder
+  demon: mixamo("mx03"), // horned demon, flaming hand
+  teen: mixamo("mx04"), // boy in T-shirt and shorts
+  trooper: mixamo("mx05"), // armoured soldier
+  anime_girl: mixamo("mx06"), // teal hair, pink shorts
+  dwarf: mixamo("mx07"), // white beard, striped shirt
+  rock_brute: mixamo("mx08"), // stone-armed brute
+  red_suit: mixamo("mx09"), // red bodysuit, black mask
+  dancer: mixamo("mx10"), // headphones, yellow pants
+  dark_knight: mixamo("mx11"), // black horned armour
+  big_elvis: mixamo("mx12"), // big man in a white jumpsuit
+  iron_knight: mixamo("mx13"), // grey helmet and armour
+  luchador: mixamo("mx14"), // masked wrestler
+  red_knight: mixamo("mx16"), // red hood, crusader tunic
+  cartoon_boy: mixamo("mx17"), // big-head cartoon boy
 };
 
 /** Body offsets for a fake pose; `k` runs 0 -> 1 -> 0 over 0.45 s, death falls over 0.8 s and stays down. */
-function proceduralPose(name, time) {
+function proceduralPose(name, time, withClip = false) {
+  if (withClip && name.startsWith("Punch")) { // lunge into a clip punch, peaking when the fist lands
+    const k = Math.sin(Math.min(time / (2 * PUNCH_PEAK), 1) * Math.PI);
+    return { lean: 0.18 * k, twist: 0, y: 0, z: 0.15 * k };
+  }
   const k = Math.sin(Math.min(time / 0.45, 1) * Math.PI);
   const d = Math.min(time / 0.8, 1);
-  if (name.startsWith("Punch")) return { lean: 0.28 * k, twist: (name.endsWith("L") ? 0.4 : -0.4) * k, y: 0, z: 0.15 * k };
+  if (name.startsWith("Punch")) return { lean: 0.28 * k, twist: (name.endsWith("Left") ? 0.4 : -0.4) * k, y: 0, z: 0.15 * k };
   if (name.startsWith("Hit")) return { lean: -0.3 * k, twist: 0, y: 0, z: -0.12 * k };
   if (name === "Death") return { lean: -d * (Math.PI / 2 - 0.15), twist: 0, y: 0.05 * d, z: -0.4 * d };
   return { lean: 0, twist: 0, y: 0, z: 0 };
 }
-const PROCEDURAL = ["Punch_L", "Punch_R", "HitRecieve", "HitRecieve_2", "Death"];
+const PROCEDURAL = ["Punch_Left", "Punch_Right", "HitRecieve", "HitRecieve_2", "Death"];
 
 export class Opponent {
   static async load(spec) {
@@ -74,7 +88,9 @@ export class Opponent {
     this.mixer = new THREE.AnimationMixer(model);
     const byName = Object.fromEntries(gltf.animations.map((c) => [clipName(c.name), c]));
     this.freeze = {};
-    this.clips = clipMap
+    this.speed = {};
+    this.punchLead = 0.35; // seconds from starting a punch to the fist landing (main.js times the hit with it)
+    this.clips = clipMap?.auto ? this.autoPunches(byName[clipMap.auto]) : clipMap
       ? Object.fromEntries(Object.entries(clipMap).flatMap(([ours, real]) => {
         const { clip, freeze } = typeof real === "string" ? { clip: real } : real;
         if (!byName[clip]) return [];
@@ -88,6 +104,54 @@ export class Opponent {
     });
     this.flashLevel = 0;
     this.play("Idle");
+  }
+
+  /** Cut Punch_Left / Punch_Right out of one Mixamo clip where each hand reaches furthest forward. */
+  autoPunches(clip) {
+    const bone = (end) => {
+      let found = null;
+      this.model.traverse((o) => { if (!found && o.isBone && o.name.endsWith(end)) found = o; });
+      return found;
+    };
+    const hips = bone("Hips"), hands = { L: bone("LeftHand"), R: bone("RightHand") };
+    if (!clip) return {};
+    if (!hips || !hands.L || !hands.R) return { Idle: clip };
+
+    // sample the clip: how far in front of the hips each hand is
+    const FPS = 30, n = Math.max(2, Math.floor(clip.duration * FPS));
+    const probe = new THREE.AnimationMixer(this.model);
+    probe.clipAction(clip).play();
+    this.model.updateMatrixWorld(true);
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.model.getWorldQuaternion(new THREE.Quaternion()));
+    const h = new THREE.Vector3(), p = new THREE.Vector3();
+    const ext = { L: [], R: [] };
+    for (let i = 0; i <= n; i++) {
+      probe.setTime(i / FPS);
+      this.model.updateMatrixWorld(true);
+      hips.getWorldPosition(h);
+      for (const s of ["L", "R"]) ext[s].push(hands[s].getWorldPosition(p).sub(h).dot(fwd));
+    }
+    probe.stopAllAction();
+    probe.uncacheRoot(this.model);
+
+    const range = (a) => Math.max(...a) - Math.min(...a);
+    // first local maximum that reaches 85% of the way to the hand's furthest point
+    const peak = (a) => {
+      const lo = Math.min(...a), thr = lo + 0.85 * (Math.max(...a) - lo);
+      return a.findIndex((v, i) => v >= thr && v >= (a[i + 1] ?? -Infinity));
+    };
+    const peaks = { L: peak(ext.L), R: peak(ext.R) };
+    // most Mixamo punch clips are one strike (e.g. a left hook): a hand that moves much less than
+    // the other only drifts, so both punches use the striking hand
+    if (range(ext.L) < 0.7 * range(ext.R)) peaks.L = peaks.R;
+    if (range(ext.R) < 0.7 * range(ext.L)) peaks.R = peaks.L;
+    const cut = (name, i) => THREE.AnimationUtils.subclip(clip, name,
+      Math.max(0, i - Math.round(WINDUP * FPS)), Math.min(n, i + Math.round(0.3 * FPS)), FPS);
+    this.speed.Punch_Left = this.speed.Punch_Right = WINDUP / PUNCH_PEAK;
+    this.punchLead = PUNCH_PEAK;
+    const sum = ext.L.map((v, i) => v + ext.R[i]);
+    this.freeze.Idle = sum.indexOf(Math.min(...sum)) / FPS;
+    return { Idle: clip, Punch_Left: cut("Punch_Left", peaks.L), Punch_Right: cut("Punch_Right", peaks.R) };
   }
 
   dress(muayThai = true) {
@@ -139,13 +203,17 @@ export class Opponent {
   /** เล่นท่า: loop = วนซ้ำ (ยืน), ไม่ loop = เล่นครั้งเดียวแล้วกลับไปท่ายืน (ยกเว้นท่าล้ม) */
   play(name, { fade = 0.2, loop = name === "Idle" } = {}) {
     const clip = this.clips[name];
-    if (this.fakePoses && PROCEDURAL.includes(name)) this.proc = { name, time: 0, loop: false };
+    if (this.fakePoses && PROCEDURAL.includes(name)) {
+      if (!clip) this.proc = { name, time: 0, withClip: false };
+      else if (name.startsWith("Punch")) this.proc = { name, time: 0, withClip: true };
+    }
     else if (name === "Idle") this.proc = null;
     if (!clip) return;
     const action = this.mixer.clipAction(clip);
     action.reset();
     action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
     action.clampWhenFinished = !loop;
+    action.setEffectiveTimeScale(this.speed[name] ?? 1);
     if (this.current && this.current !== action) {
       action.crossFadeFrom(this.current, fade, false);
     }
@@ -179,8 +247,9 @@ export class Opponent {
     let pose = { lean: 0, twist: 0, y: bob, z: 0 };
     if (this.proc) {
       this.proc.time += dt;
-      pose = proceduralPose(this.proc.name, this.proc.time);
-      if (this.proc.name !== "Death" && this.proc.time > 0.45) this.proc = null;
+      pose = proceduralPose(this.proc.name, this.proc.time, this.proc.withClip);
+      const end = this.proc.withClip ? 2 * PUNCH_PEAK : 0.45;
+      if (this.proc.name !== "Death" && this.proc.time > end) this.proc = null;
     }
     this.body.rotation.set(pose.lean, pose.twist, 0);
     this.body.position.set(0, pose.y, pose.z);
