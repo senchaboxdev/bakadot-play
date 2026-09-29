@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BakaDot</title>
+  <meta name="description" content="Muay Thai workout game you play with your webcam: punch, elbow, knee and guard.">
+  <link rel="stylesheet" href="src/game.css?v=5f1590a">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="src/main.js?v=5f1590a"></script>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="hud"></div>
+
+  <div id="start">
+    <h1>BakaDot</h1>
+    <p>Muay Thai workout with your webcam: punch · elbow · knee · guard</p>
+    <ul>
+      <li>Stand about 2 m from the camera so it sees you from head to knees</li>
+      <li>Keep your guard up near your face and return to guard after every strike</li>
+      <li>When you hear "Guard!", raise your guard fast</li>
+    </ul>
+    <button type="button" id="start-camera">Start (turn on camera)</button>
+    <button type="button" id="start-keys" class="link">Play with the keyboard instead</button>
+    <p class="note" id="start-note">Camera video is processed on this device only and is never uploaded</p>
+  </div>
+</body>
+</html>
