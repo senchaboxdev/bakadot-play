@@ -1,6 +1,6 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=63dd27d";
-import { clock } from "./workout.js?v=63dd27d";
+import { PLAYER_MAX_HP } from "./fight.js?v=f63b592";
+import { clock } from "./workout.js?v=f63b592";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -134,7 +134,7 @@ export class Hud {
       setHp(this.oppBar, fight.oppHp / fight.oppMax);
       const t = Math.ceil(fight.timeLeft);
       const clock = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
-      this.roundLabel.textContent = fight.phase === "rest" ? "REST" : `ROUND ${fight.round}/${fight.f.rounds}`;
+      this.roundLabel.textContent = fight.phase === "rest" ? `REST · ROUND ${fight.round + 1} NEXT` : `ROUND ${fight.round}/${fight.f.rounds}`;
       this.clockEl.textContent = clock;
       this.roundEl.classList.toggle("rest", fight.phase === "rest");
     }

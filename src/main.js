@@ -8,17 +8,17 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=63dd27d";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=63dd27d";
-import { Gloves } from "./gloves.js?v=63dd27d";
-import { Effects } from "./effects.js?v=63dd27d";
-import { GameAudio } from "./audio.js?v=63dd27d";
-import { Hud } from "./hud.js?v=63dd27d";
-import { Tweens, lerp } from "./tween.js?v=63dd27d";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=63dd27d";
-import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=63dd27d";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=63dd27d";
-import { startVision } from "./vision.js?v=63dd27d";
+import { buildArena, loadEnvironment } from "./arena.js?v=f63b592";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=f63b592";
+import { Gloves } from "./gloves.js?v=f63b592";
+import { Effects } from "./effects.js?v=f63b592";
+import { GameAudio } from "./audio.js?v=f63b592";
+import { Hud } from "./hud.js?v=f63b592";
+import { Tweens, lerp } from "./tween.js?v=f63b592";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=f63b592";
+import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=f63b592";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=f63b592";
+import { startVision } from "./vision.js?v=f63b592";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
