@@ -1,6 +1,6 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=2847e0b";
-import { clock } from "./workout.js?v=2847e0b";
+import { PLAYER_MAX_HP } from "./fight.js?v=63dd27d";
+import { clock } from "./workout.js?v=63dd27d";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -218,7 +218,13 @@ export class Hud {
     if (r.champion) this.result.append(h("p", "sub", "You beat every fighter. You are the champion!"));
     else if (r.next) this.result.append(h("p", "sub", `Next: ${r.next.name} · ${r.next.title}`));
     const again = r.win ? (r.champion ? "Play again from stage 1" : "Next fight") : "Try again";
-    this.result.append(h("p", "choices", `◀ Punch LEFT: Menu        Punch RIGHT: ${again} ▶`));
+    this.choicesEl = h("p", "choices", `◀ Punch LEFT: Menu        Punch RIGHT: ${again} ▶`);
+    this.result.append(this.choicesEl);
     this.setMode("result");
+  }
+
+  /** Result screen after a win: counting down to the next fight (it starts by itself). */
+  nextFightIn(seconds) {
+    this.choicesEl.textContent = `◀ Punch LEFT: Menu        Next fight in ${Math.ceil(seconds)}… ▶`;
   }
 }

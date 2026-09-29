@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>BakaDot</title>
-  <meta name="bakadot-version" content="v50 · 2847e0b · 2026-09-29 21:11">
+  <meta name="bakadot-version" content="v51 · 63dd27d · 2026-09-29 21:19">
   <meta name="description" content="Muay Thai workout game you play with your webcam: punch, elbow, knee and guard.">
-  <link rel="stylesheet" href="src/game.css?v=2847e0b">
+  <link rel="stylesheet" href="src/game.css?v=63dd27d">
   <script type="importmap">
     {
       "imports": {
@@ -15,7 +15,7 @@
       }
     }
   </script>
-  <script type="module" src="src/main.js?v=2847e0b"></script>
+  <script type="module" src="src/main.js?v=63dd27d"></script>
 </head>
 <body>
   <div id="stage"></div>
@@ -29,7 +29,10 @@
       <li>Keep your guard up near your face and return to guard after every strike</li>
       <li>When you hear "Guard!", raise your guard fast</li>
     </ul>
-    <label class="weight">Body weight <input id="weight" type="number" min="10" max="200" step="1" inputmode="numeric"> kg <span>(for the calorie estimate)</span></label>
+    <div class="weight" role="group" aria-label="Body weight">
+      <div class="weight-label">Body weight (kg) <span>for the calorie estimate</span></div>
+      <div class="weight-chips" id="weight"></div>
+    </div>
     <button type="button" id="start-camera">Start (turn on camera)</button>
     <button type="button" id="start-keys" class="link">Play with the keyboard instead</button>
     <p class="note" id="start-note">Camera video is processed on this device only and is never uploaded</p>

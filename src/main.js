@@ -8,17 +8,17 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=2847e0b";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=2847e0b";
-import { Gloves } from "./gloves.js?v=2847e0b";
-import { Effects } from "./effects.js?v=2847e0b";
-import { GameAudio } from "./audio.js?v=2847e0b";
-import { Hud } from "./hud.js?v=2847e0b";
-import { Tweens, lerp } from "./tween.js?v=2847e0b";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=2847e0b";
-import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=2847e0b";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=2847e0b";
-import { startVision } from "./vision.js?v=2847e0b";
+import { buildArena, loadEnvironment } from "./arena.js?v=63dd27d";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=63dd27d";
+import { Gloves } from "./gloves.js?v=63dd27d";
+import { Effects } from "./effects.js?v=63dd27d";
+import { GameAudio } from "./audio.js?v=63dd27d";
+import { Hud } from "./hud.js?v=63dd27d";
+import { Tweens, lerp } from "./tween.js?v=63dd27d";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=63dd27d";
+import { Workout, DEFAULT_WEIGHT, addToToday, todayTotal, loadWeight, saveWeight } from "./workout.js?v=63dd27d";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=63dd27d";
+import { startVision } from "./vision.js?v=63dd27d";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -36,6 +36,7 @@ const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, hp: 40, dodgeChance: 0.12, ge
 const DODGE_COOLDOWN = 1.0;
 const MENU_LOCK = 1.0; // วินาที
 const RESULT_LOCK = 1.5; // วินาที หลังหน้าสรุปผลขึ้น
+const NEXT_FIGHT_IN = 5; // ชนะแล้ว: นับถอยหลังแล้วไปไฟต์ต่อไปเอง (ต่อยซ้าย = กลับเมนู)
 const startScreenShown = () => !document.getElementById("start").hidden;
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
 const OUT_TIME = 0.08; // นวมพุ่งออก
@@ -137,6 +138,7 @@ const state = {
   oppState: { guard: false, open: false },
   shake: 0,
   menuLock: 0, // วินาทีที่เมนูยังไม่รับการเลือก (หลังเพิ่งเข้าเมนู)
+  nextFight: 0, // วินาทีที่เหลือก่อนเริ่มไฟต์ต่อไปเอง (0 = ไม่นับ)
 };
 
 // warm the cache for the stage the player is about to fight while they read the menu (the rest load on demand)
@@ -268,6 +270,10 @@ async function onFightFinished(r) {
   if (state.mode === "result") {
     hud.showResult(r);
     state.menuLock = RESULT_LOCK;
+    if (r.win && !r.champion) {
+      state.nextFight = NEXT_FIGHT_IN;
+      hud.nextFightIn(NEXT_FIGHT_IN);
+    }
   }
 }
 
@@ -413,6 +419,12 @@ renderer.setAnimationLoop(() => {
   if (state.mode === "fight") state.fight?.update(dt);
   state.free.dodgeWait = Math.max(state.free.dodgeWait - dt, 0);
   state.menuLock = Math.max(state.menuLock - dt, 0);
+  if (state.nextFight > 0) {
+    state.nextFight -= dt;
+    if (state.mode !== "result") state.nextFight = 0; // ออกจากหน้าสรุปไปแล้ว (ต่อยซ้าย/ขวา)
+    else if (state.nextFight <= 0) startFight(STAGES[state.stage]);
+    else hud.nextFightIn(state.nextFight);
+  }
   // นับเวลาออกกำลังกาย: สู้/ซ้อม = active, พักระหว่างยก = rest, เมนู/สรุปผล = ไม่นับ
   const activity = state.mode === "free" ? "active"
     : state.mode === "fight" ? (state.fight?.phase === "rest" ? "rest" : "active") : null;
@@ -470,16 +482,30 @@ document.getElementById("start-keys").addEventListener("click", () => {
 hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
 hud.setToday(todayTotal(localStorageSafe()));
 
-// น้ำหนักตัว (ใช้คำนวณแคลอรี) เก็บในเบราว์เซอร์
-const weightInput = document.getElementById("weight");
-weightInput.value = state.workout.weight;
-weightInput.addEventListener("change", () => {
-  const kg = Number(weightInput.value);
-  if (kg >= 10 && kg <= 200) {
-    state.workout.weight = kg;
-    saveWeight(localStorageSafe(), kg);
-  } else weightInput.value = state.workout.weight;
-});
+// น้ำหนักตัว (ใช้คำนวณแคลอรี): กดเลือกช่วง ใช้ค่ากลางของช่วง เก็บในเบราว์เซอร์
+const WEIGHT_RANGES = [[20, 30], [30, 40], [40, 50], [50, 60], [60, 70], [70, 80], [80, 100]];
+const weightChips = document.getElementById("weight");
+const mid = ([lo, hi]) => (lo + hi) / 2;
+const showWeight = () => {
+  for (const chip of weightChips.children) chip.setAttribute("aria-pressed", String(Number(chip.dataset.kg) === state.workout.weight));
+};
+for (const range of WEIGHT_RANGES) {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "chip";
+  chip.dataset.kg = mid(range);
+  chip.textContent = range[1] === 100 ? `${range[0]}+` : `${range[0]}–${range[1]}`;
+  chip.addEventListener("click", () => {
+    state.workout.weight = mid(range);
+    saveWeight(localStorageSafe(), state.workout.weight);
+    showWeight();
+  });
+  weightChips.append(chip);
+}
+// น้ำหนักที่เคยเก็บไว้ (หรือค่าเริ่มต้น) ปัดเข้าช่วงที่ใกล้ที่สุด
+state.workout.weight = mid(WEIGHT_RANGES.reduce((best, r) =>
+  Math.abs(mid(r) - state.workout.weight) < Math.abs(mid(best) - state.workout.weight) ? r : best));
+showWeight();
 
 // เวอร์ชัน (build-site.sh ใส่ให้ตอน build; เปิดในเครื่อง = dev)
 const version = document.querySelector('meta[name="bakadot-version"]')?.content ?? "dev";

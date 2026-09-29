@@ -131,6 +131,19 @@ export class Opponent {
       hips.getWorldPosition(h);
       for (const s of ["L", "R"]) ext[s].push(hands[s].getWorldPosition(p).sub(h).dot(fwd));
     }
+    // the guard stance is bladed (chest turned sideways): turn the whole model so the chest in
+    // the Idle stance faces the player (+z)
+    const sum = ext.L.map((v, i) => v + ext.R[i]);
+    this.freeze.Idle = sum.indexOf(Math.min(...sum)) / FPS;
+    const arms = { L: bone("LeftArm"), R: bone("RightArm") };
+    if (arms.L && arms.R) {
+      probe.setTime(this.freeze.Idle);
+      this.model.updateMatrixWorld(true);
+      const across = arms.R.getWorldPosition(p).sub(arms.L.getWorldPosition(h));
+      const facing = new THREE.Vector3(0, 1, 0).cross(across);
+      this.model.rotation.y -= Math.atan2(facing.x, facing.z);
+      this.model.updateMatrixWorld(true);
+    }
     probe.stopAllAction();
     probe.uncacheRoot(this.model);
 
@@ -149,8 +162,6 @@ export class Opponent {
       Math.max(0, i - Math.round(WINDUP * FPS)), Math.min(n, i + Math.round(0.3 * FPS)), FPS);
     this.speed.Punch_Left = this.speed.Punch_Right = WINDUP / PUNCH_PEAK;
     this.punchLead = PUNCH_PEAK;
-    const sum = ext.L.map((v, i) => v + ext.R[i]);
-    this.freeze.Idle = sum.indexOf(Math.min(...sum)) / FPS;
     return { Idle: clip, Punch_Left: cut("Punch_Left", peaks.L), Punch_Right: cut("Punch_Right", peaks.R) };
   }
 
