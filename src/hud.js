@@ -1,7 +1,7 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=942180b";
-import { clock } from "./workout.js?v=942180b";
-import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=942180b";
+import { PLAYER_MAX_HP } from "./fight.js?v=d8eb412";
+import { clock } from "./workout.js?v=d8eb412";
+import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=d8eb412";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -82,8 +82,17 @@ export class Hud {
     this.menu = this.buildMenu();
     this.result = h("div", "screen result");
 
+    // ปุ่มหยุดชั่วคราว (ขึ้นตอนสู้/ซ้อม) + จอ Paused: แตะตรงไหนก็ได้เพื่อเล่นต่อ
+    this.pauseBtn = h("button", "pause-btn", "⏸");
+    this.pauseBtn.type = "button";
+    this.pauseBtn.setAttribute("aria-label", "Pause");
+    this.pauseBtn.addEventListener("click", () => this.onPause());
+    this.pausedEl = h("div", "screen paused");
+    this.pausedEl.append(h("h1", "", "Paused"), h("p", "sub", "Tap to continue"));
+    this.pausedEl.addEventListener("click", () => this.onResume());
+
     root.append(this.flash, this.freePanel, this.workoutEl, this.fightPanel, this.oppTag, this.banner, this.pop,
-      this.warnBox, this.msg, this.status, this.guardEl, this.menu, this.result);
+      this.warnBox, this.msg, this.status, this.guardEl, this.menu, this.result, this.pauseBtn, this.pausedEl);
     this.setMode("menu");
   }
 
@@ -101,13 +110,47 @@ export class Hud {
       card("left", "Free Play", "Throw punches, elbows and knees. Guard when you hear \"Guard!\"."),
       (this.storyCard = card("right", "Road of the Nak Muay", "")),
     );
-    menu.append(row);
+    menu.append(row, this.buildRestart());
     return menu;
+  }
+
+  /** ปุ่มเริ่มด่าน 1 ใหม่ (ขึ้นเมื่อไปถึงด่าน 2 ขึ้นไป) ต้องแตะสองครั้ง ลูกกดพลาดทีเดียวด่านจะได้ไม่หาย */
+  buildRestart() {
+    const LABEL = "↺ Start from Stage 1";
+    const btn = h("button", "action restart", LABEL);
+    btn.type = "button";
+    btn.hidden = true;
+    let armed = 0;
+    btn.addEventListener("click", () => {
+      if (!armed) {
+        btn.textContent = "Tap again to start over";
+        armed = setTimeout(() => { armed = 0; btn.textContent = LABEL; }, 3000);
+        return;
+      }
+      clearTimeout(armed);
+      armed = 0;
+      btn.textContent = LABEL;
+      this.onRestart();
+    });
+    this.restartBtn = btn;
+    return btn;
+  }
+
+  /** ตั้งใน main.js: กลับไปด่าน 1 */
+  onRestart() {}
+  /** ตั้งใน main.js: กดปุ่ม ⏸ / แตะจอ Paused */
+  onPause() {}
+  onResume() {}
+
+  setPaused(on) {
+    if (on) this.root.dataset.paused = "";
+    else delete this.root.dataset.paused;
   }
 
   /** Story card text: which stage is next (stage = 1-based number, fighter = its data). */
   setNextStage(stage, total, fighter) {
     this.storyCard.lastChild.textContent = `Stage ${stage} of ${total}: ${fighter.name}, ${fighter.title}. Knock them out or win on points.`;
+    this.restartBtn.hidden = stage <= 1;
   }
 
   /** This player's total so far (since the page opened or the weight was picked), on the menu. */

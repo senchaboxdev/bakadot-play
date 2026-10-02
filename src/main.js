@@ -8,18 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=942180b";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=942180b";
-import { Gloves } from "./gloves.js?v=942180b";
-import { Effects } from "./effects.js?v=942180b";
-import { GameAudio } from "./audio.js?v=942180b";
-import { Hud } from "./hud.js?v=942180b";
-import { Tweens, lerp } from "./tween.js?v=942180b";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=942180b";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=942180b";
-import { capturePhoto, makeCard } from "./champion.js?v=942180b";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=942180b";
-import { startVision } from "./vision.js?v=942180b";
+import { buildArena, loadEnvironment } from "./arena.js?v=d8eb412";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=d8eb412";
+import { Gloves } from "./gloves.js?v=d8eb412";
+import { Effects } from "./effects.js?v=d8eb412";
+import { GameAudio } from "./audio.js?v=d8eb412";
+import { Hud } from "./hud.js?v=d8eb412";
+import { Tweens, lerp } from "./tween.js?v=d8eb412";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=d8eb412";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=d8eb412";
+import { capturePhoto, makeCard } from "./champion.js?v=d8eb412";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=d8eb412";
+import { startVision } from "./vision.js?v=d8eb412";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -122,6 +122,7 @@ const state = {
   shake: 0,
   menuLock: 0, // วินาทีที่เมนูยังไม่รับการเลือก (หลังเพิ่งเข้าเมนู)
   nextFight: 0, // วินาทีที่เหลือก่อนเริ่มไฟต์ต่อไปเอง (0 = ไม่นับ)
+  paused: false, // กดปุ่ม ⏸: ทุกอย่างหยุด (เวลายก คู่ต่อสู้ เวลาออกกำลังกาย) และไม่นับท่า
 };
 
 // น้ำหนักตัว (ใช้คำนวณแคลอรี): กดเลือกช่วง ใช้ค่ากลางของช่วง เก็บในเบราว์เซอร์
@@ -188,7 +189,7 @@ function onAction(action) {
   if (action === "camera_on") return void (state.connected = true);
   if (action === "guard_on") return void (state.guarding = true);
   if (action === "guard_off") return void (state.guarding = false);
-  if (!(action in STRIKE_TYPES) || state.mode === "loading") return;
+  if (!(action in STRIKE_TYPES) || state.mode === "loading" || state.paused) return;
   if (state.mode === "menu") {
     if (startScreenShown() || state.menuLock > 0) return; // ยังอยู่หน้าเริ่ม / เพิ่งเข้าเมนู: กันหมัดที่ไม่ได้ตั้งใจ
     if (action === "punch_left") startFree();
@@ -232,6 +233,7 @@ function bankWorkout() {
 }
 
 function toMenu() {
+  setPaused(false);
   if (state.mode === "free" || state.mode === "fight") bankWorkout();
   state.mode = "menu";
   state.menuLock = MENU_LOCK;
@@ -471,6 +473,7 @@ const headPos = new THREE.Vector3();
 
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
+  if (state.paused) return void renderFrame(0);
   tweens.update(dt);
   opponent.update(dt);
   fx.update(dt);
@@ -549,6 +552,21 @@ startButton.disabled = false;
 document.getElementById("start-keys").hidden = false;
 
 hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
+// หยุดชั่วคราว: ปุ่ม ⏸ ขึ้นเฉพาะตอนสู้/ซ้อม
+function setPaused(on) {
+  state.paused = on;
+  hud.setPaused(on);
+}
+hud.onPause = () => { if (state.mode === "free" || state.mode === "fight") setPaused(true); };
+hud.onResume = () => setPaused(false);
+// ปุ่ม "Start from Stage 1" ในเมนู: ล้างด่านที่บันทึกไว้แล้วกลับไปด่าน 1
+hud.onRestart = () => {
+  state.stage = 0;
+  saveStage(0);
+  hud.setNextStage(1, STAGES.length, FIGHTERS[STAGES[0]]);
+  arena.setVenue(FIGHTERS[STAGES[0]].venue);
+  state.menuLock = MENU_LOCK;
+};
 
 // เวอร์ชัน (build-site.sh ใส่ให้ตอน build; เปิดในเครื่อง = dev)
 const version = document.querySelector('meta[name="bakadot-version"]')?.content ?? "dev";
