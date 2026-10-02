@@ -110,15 +110,15 @@ export const shoulderWidth = (img) => Math.abs(img[L_SHOULDER].x - img[R_SHOULDE
 
 export function framingHint(img) {
   const ls = img[L_SHOULDER], rs = img[R_SHOULDER];
-  if (shoulderWidth(img) > TOO_CLOSE_SHOULDER_WIDTH) return "Step back (too close to the camera)";
-  if ((ls.y + rs.y) / 2 > 0.55) return "Tilt the camera down / place it lower";
+  if (shoulderWidth(img) > TOO_CLOSE_SHOULDER_WIDTH) return "Step back";
+  if ((ls.y + rs.y) / 2 > 0.55) return "Lower the camera";
   for (const side of SIDES) {
     const w = img[ARM_LANDMARKS[side][2]];
-    if (!(w.x >= 0.02 && w.x <= 0.98 && w.y >= 0.02 && w.y <= 0.98)) return "Keep both hands in the frame";
+    if (!(w.x >= 0.02 && w.x <= 0.98 && w.y >= 0.02 && w.y <= 0.98)) return "Hands in view";
   }
   for (const k of [25, 26]) {
     const knee = img[k];
-    if (knee.visibility < 0.5 || knee.y > 0.97) return "Step back a bit so your knees are visible";
+    if (knee.visibility < 0.5 || knee.y > 0.97) return "Show your knees";
   }
   return null;
 }

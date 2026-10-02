@@ -3,7 +3,7 @@
 // ทำหน้าที่เดียวกับ vision/pose_viewer.py + vision/action_server.py ในเวอร์ชันเดสก์ท็อป
 
 import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
-import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=e8f76bb";
+import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=942180b";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
 const MODEL_URL = "models/pose_landmarker_full.task";
@@ -117,8 +117,8 @@ function draw(img, t) {
   ctx.clearRect(0, 0, w, h);
 
   let message = null;
-  if (!img) message = "Stand in front of the camera";
-  else if (detector.blocked) message = "Step back (too close to the camera)";
+  if (!img) message = "Stand in view";
+  else if (detector.blocked) message = "Step back";
   else if (detector.settling) message = "Hold still...";
   else message = framingHint(img);
   hint.textContent = message ?? "";

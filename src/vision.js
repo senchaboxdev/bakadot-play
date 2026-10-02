@@ -2,7 +2,7 @@
 // action: "punch_left", "elbow_right", "knee_left", "guard_on", "guard_off", "camera_on"
 // ภาพจากกล้องประมวลผลในเครื่องนี้เท่านั้น
 import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
-import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=e8f76bb";
+import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=942180b";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
 const MODEL_URL = "models/pose_landmarker_full.task";
@@ -16,12 +16,32 @@ const BONES = [
 /** เปิดกล้องและเริ่มจับท่า; โยน error ถ้าเปิดกล้อง/โหลดโมเดลไม่ได้ */
 export async function startVision(onAction) {
   const ui = buildPanel();
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-    audio: false,
+  const openCamera = async () => {
+    ui.video.srcObject?.getTracks().forEach((track) => track.stop());
+    ui.video.srcObject = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+      audio: false,
+    });
+    await ui.video.play();
+  };
+  await openCamera();
+  // สลับแอป/ล็อกจอ/สลับแท็บแล้วกลับมา: เบราว์เซอร์ (โดยเฉพาะ iPhone) หยุดกล้องหรือหยุดวิดีโอไว้
+  // กลับมาแล้วเปิดกล้องใหม่ถ้ากล้องถูกปิด ไม่งั้นแค่เล่นวิดีโอต่อ
+  let reopening = false;
+  document.addEventListener("visibilitychange", async () => {
+    if (document.hidden || reopening) return;
+    const live = ui.video.srcObject?.getVideoTracks().some((track) => track.readyState === "live" && !track.muted);
+    reopening = true;
+    try {
+      if (live) await ui.video.play();
+      else await openCamera();
+    } catch (err) {
+      console.warn("Could not resume the camera", err);
+      ui.hint.textContent = "Camera off: reload";
+    } finally {
+      reopening = false;
+    }
   });
-  ui.video.srcObject = stream;
-  await ui.video.play();
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
   const landmarker = await PoseLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: MODEL_URL, delegate: "GPU" },
@@ -42,6 +62,10 @@ export async function startVision(onAction) {
   let lastFrameAt = performance.now();
 
   const loop = () => {
+    requestAnimationFrame(loop); // ก่อนประมวลผล: เฟรมไหน error (เช่น GPU หลุดตอนกลับเข้าแอป) ก็ยังจับเฟรมถัดไปต่อ
+    try { step(); } catch (err) { console.warn("Pose frame failed", err); }
+  };
+  const step = () => {
     const video = ui.video;
     if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
       lastVideoTime = video.currentTime;
@@ -70,7 +94,6 @@ export async function startVision(onAction) {
       lastFrameAt = nowMs;
       draw(ui, img, t, detector, guard, lastStrike, fps);
     }
-    requestAnimationFrame(loop);
   };
   loop();
 }
@@ -87,8 +110,8 @@ function draw(ui, img, t, detector, guard, lastStrike, fps) {
   ctx.clearRect(0, 0, w, h);
 
   let message = null;
-  if (!img) message = "Stand in front of the camera";
-  else if (detector.blocked) message = "Step back (too close to the camera)";
+  if (!img) message = "Stand in view";
+  else if (detector.blocked) message = "Step back";
   else if (detector.settling) message = "Hold still...";
   else message = framingHint(img);
   ui.hint.textContent = message ?? "";

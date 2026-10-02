@@ -170,12 +170,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; col
 #cam .mirror { position: relative; transform: scaleX(-1); }
 #cam video, #cam canvas { display: block; width: 100%; height: auto; }
 #cam canvas { position: absolute; inset: 0; height: 100%; }
-#cam .hint { padding: 6px 8px; background: rgba(0,0,0,.8); color: #ffb300; font-size: 14px; }
+#cam .hint { padding: 6px 8px; background: rgba(0,0,0,.8); color: #ffb300; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* บรรทัดเดียวเสมอ */
 #cam .hint[hidden] { display: none; }
 #cam .cam-status { padding: 4px 8px; background: rgba(0,0,0,.8); color: #9be49b; font-size: 13px; }
 
 @media (max-width: 700px) {
   #cam { width: 36vw; right: 8px; bottom: 48px; }
+  #cam .hint { font-size: 13px; padding: 5px 6px; }
   #hud .cards { gap: 12px; }
   #hud .card { width: 44vw; padding: 12px; }
 }
