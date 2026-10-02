@@ -236,7 +236,7 @@ body:has(#start:not([hidden])) #version, body:has(#hud[data-mode="menu"]) #versi
 #hud[data-mode="free"] .pause-btn, #hud[data-mode="fight"] .pause-btn { display: block; }
 #hud[data-paused] .pause-btn { display: none; }
 #hud[data-paused] .paused { display: flex; pointer-events: auto; cursor: pointer; }
-#hud .action.restart { margin-top: 14px; padding: 8px 18px; font-size: 15px; color: #f5f5f5; background: rgba(255, 255, 255, 0.12); box-shadow: none; border: 1px solid rgba(255, 255, 255, 0.35); }
+#hud .action.restart { position: absolute; top: 12px; right: 12px; padding: 8px 18px; font-size: 15px; color: #f5f5f5; background: rgba(255, 255, 255, 0.12); box-shadow: none; border: 1px solid rgba(255, 255, 255, 0.35); } /* มุมขวาบน: จอมือถือแนวนอนเตี้ย ใต้การ์ดจะตกขอบจอ */
 #hud .action[hidden] { display: none; }
 #hud .action.share { color: #fff; background: linear-gradient(180deg, #4fa3ff, #1f5fd6); box-shadow: 0 4px 16px rgba(42, 123, 255, 0.35); }
 #hud .card-note { margin: 0; max-width: 26em; font-size: 13px; font-weight: 400; opacity: 0.7; }
