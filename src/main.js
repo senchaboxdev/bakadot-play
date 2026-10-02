@@ -8,18 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=ba47c84";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=ba47c84";
-import { Gloves } from "./gloves.js?v=ba47c84";
-import { Effects } from "./effects.js?v=ba47c84";
-import { GameAudio } from "./audio.js?v=ba47c84";
-import { Hud } from "./hud.js?v=ba47c84";
-import { Tweens, lerp } from "./tween.js?v=ba47c84";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=ba47c84";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=ba47c84";
-import { capturePhoto, makeCard } from "./champion.js?v=ba47c84";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=ba47c84";
-import { startVision } from "./vision.js?v=ba47c84";
+import { buildArena, loadEnvironment } from "./arena.js?v=e8f76bb";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=e8f76bb";
+import { Gloves } from "./gloves.js?v=e8f76bb";
+import { Effects } from "./effects.js?v=e8f76bb";
+import { GameAudio } from "./audio.js?v=e8f76bb";
+import { Hud } from "./hud.js?v=e8f76bb";
+import { Tweens, lerp } from "./tween.js?v=e8f76bb";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=e8f76bb";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=e8f76bb";
+import { capturePhoto, makeCard } from "./champion.js?v=e8f76bb";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=e8f76bb";
+import { startVision } from "./vision.js?v=e8f76bb";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -88,24 +88,6 @@ const fx = new Effects(scene);
 const audio = new GameAudio();
 const hud = new Hud(document.getElementById("hud"));
 const gloves = new Gloves(camera);
-// One opponent model per fighter, loaded on demand and kept. `opponent` is whichever is in the ring.
-const opponentCache = new Map();
-async function loadOpponent(modelKey) {
-  if (!opponentCache.has(modelKey)) opponentCache.set(modelKey, Opponent.load(OPPONENT_MODELS[modelKey] ?? OPPONENT_MODELS.boxer));
-  return opponentCache.get(modelKey);
-}
-let opponent = await loadOpponent(FIGHTERS[STAGES[0]].model);
-scene.add(opponent.group);
-async function showOpponent(modelKey) {
-  const next = await loadOpponent(modelKey);
-  if (next !== opponent) {
-    scene.remove(opponent.group);
-    opponent = next;
-    scene.add(opponent.group);
-  }
-  opponent.reset();
-}
-audio.load();
 
 // ---------- ด่าน (stage progression) ----------
 // ?stage=N starts at stage N. Progress (furthest stage reached) is kept in localStorage.
@@ -141,6 +123,60 @@ const state = {
   menuLock: 0, // วินาทีที่เมนูยังไม่รับการเลือก (หลังเพิ่งเข้าเมนู)
   nextFight: 0, // วินาทีที่เหลือก่อนเริ่มไฟต์ต่อไปเอง (0 = ไม่นับ)
 };
+
+// น้ำหนักตัว (ใช้คำนวณแคลอรี): กดเลือกช่วง ใช้ค่ากลางของช่วง เก็บในเบราว์เซอร์
+// ทำก่อนรอโหลดโมเดลคู่ต่อสู้ ปุ่มเลือกน้ำหนักจะได้ขึ้นพร้อมปุ่ม Start
+const WEIGHT_RANGES = [[20, 30], [30, 40], [40, 50], [50, 60], [60, 70], [70, 80], [80, 100]];
+const weightChips = document.getElementById("weight");
+const mid = ([lo, hi]) => (lo + hi) / 2;
+const showWeight = () => {
+  for (const chip of weightChips.children) chip.setAttribute("aria-pressed", String(Number(chip.dataset.kg) === state.workout.weight));
+};
+for (const range of WEIGHT_RANGES) {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "chip";
+  chip.dataset.kg = mid(range);
+  chip.textContent = range[1] === 100 ? `${range[0]}+` : `${range[0]}–${range[1]}`;
+  chip.addEventListener("click", () => {
+    // เลือกน้ำหนัก = คนใหม่: เริ่มนับเวลา/แคลอรีใหม่
+    state.workout = new Workout(mid(range));
+    saveWeight(localStorageSafe(), state.workout.weight);
+    hud.setSession(state.workout);
+    showWeight();
+  });
+  weightChips.append(chip);
+}
+// น้ำหนักที่เคยเก็บไว้ (หรือค่าเริ่มต้น) ปัดเข้าช่วงที่ใกล้ที่สุด
+state.workout.weight = mid(WEIGHT_RANGES.reduce((best, r) =>
+  Math.abs(mid(r) - state.workout.weight) < Math.abs(mid(best) - state.workout.weight) ? r : best));
+showWeight();
+
+// One opponent model per fighter, loaded on demand and kept. `opponent` is whichever is in the ring.
+const opponentCache = new Map();
+async function loadOpponent(modelKey, onProgress) {
+  if (!opponentCache.has(modelKey)) opponentCache.set(modelKey, Opponent.load(OPPONENT_MODELS[modelKey] ?? OPPONENT_MODELS.boxer, onProgress));
+  return opponentCache.get(modelKey);
+}
+// ปุ่ม Start ขึ้น "Loading… 42%" ระหว่างโหลดโมเดลคู่ต่อสู้ตัวแรก (ไฟล์ใหญ่สุดก่อนเล่นได้)
+const startButton = document.getElementById("start-camera");
+const showLoading = (e) => {
+  startButton.textContent = e.total > 0
+    ? `Loading… ${Math.min(99, Math.floor((e.loaded / e.total) * 100))}%`
+    : `Loading… ${(e.loaded / 1048576).toFixed(1)} MB`; // เซิร์ฟเวอร์ไม่บอกขนาดไฟล์
+};
+let opponent = await loadOpponent(FIGHTERS[STAGES[0]].model, showLoading);
+scene.add(opponent.group);
+async function showOpponent(modelKey) {
+  const next = await loadOpponent(modelKey);
+  if (next !== opponent) {
+    scene.remove(opponent.group);
+    opponent = next;
+    scene.add(opponent.group);
+  }
+  opponent.reset();
+}
+audio.load();
 
 // warm the cache for the stage the player is about to fight while they read the menu (the rest load on demand)
 loadOpponent(FIGHTERS[STAGES[loadStage()]].model);
@@ -483,7 +519,6 @@ function renderFrame(dt = 0.016) {
 // ---------- หน้าจอเริ่ม ----------
 
 const start = document.getElementById("start");
-const startButton = document.getElementById("start-camera");
 const startNote = document.getElementById("start-note");
 
 startButton.addEventListener("click", async () => {
@@ -508,34 +543,12 @@ document.getElementById("start-keys").addEventListener("click", () => {
   state.menuLock = MENU_LOCK;
 });
 
-hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
+// โหลดเสร็จแล้ว (โมเดลคู่ต่อสู้ + ปุ่มพร้อมรับ): เปิดปุ่มที่ index.html ปิดไว้ระหว่างโหลด
+startButton.textContent = startButton.dataset.label;
+startButton.disabled = false;
+document.getElementById("start-keys").hidden = false;
 
-// น้ำหนักตัว (ใช้คำนวณแคลอรี): กดเลือกช่วง ใช้ค่ากลางของช่วง เก็บในเบราว์เซอร์
-const WEIGHT_RANGES = [[20, 30], [30, 40], [40, 50], [50, 60], [60, 70], [70, 80], [80, 100]];
-const weightChips = document.getElementById("weight");
-const mid = ([lo, hi]) => (lo + hi) / 2;
-const showWeight = () => {
-  for (const chip of weightChips.children) chip.setAttribute("aria-pressed", String(Number(chip.dataset.kg) === state.workout.weight));
-};
-for (const range of WEIGHT_RANGES) {
-  const chip = document.createElement("button");
-  chip.type = "button";
-  chip.className = "chip";
-  chip.dataset.kg = mid(range);
-  chip.textContent = range[1] === 100 ? `${range[0]}+` : `${range[0]}–${range[1]}`;
-  chip.addEventListener("click", () => {
-    // เลือกน้ำหนัก = คนใหม่: เริ่มนับเวลา/แคลอรีใหม่
-    state.workout = new Workout(mid(range));
-    saveWeight(localStorageSafe(), state.workout.weight);
-    hud.setSession(state.workout);
-    showWeight();
-  });
-  weightChips.append(chip);
-}
-// น้ำหนักที่เคยเก็บไว้ (หรือค่าเริ่มต้น) ปัดเข้าช่วงที่ใกล้ที่สุด
-state.workout.weight = mid(WEIGHT_RANGES.reduce((best, r) =>
-  Math.abs(mid(r) - state.workout.weight) < Math.abs(mid(best) - state.workout.weight) ? r : best));
-showWeight();
+hud.setNextStage(state.stage + 1, STAGES.length, FIGHTERS[STAGES[state.stage]]);
 
 // เวอร์ชัน (build-site.sh ใส่ให้ตอน build; เปิดในเครื่อง = dev)
 const version = document.querySelector('meta[name="bakadot-version"]')?.content ?? "dev";

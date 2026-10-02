@@ -1,6 +1,6 @@
 // ใบผลงานหลังจบไฟต์ (แพ้/ชนะ/แชมป์): ภาพคนเล่นจากกล้อง + ด่านที่ไปถึง + สถิติ ทำเป็นรูป PNG ในเครื่อง
 // ภาพไม่ถูกส่งไปไหนจนกว่าผู้เล่นจะกด Save photo / Share เอง
-import { clock } from "./workout.js?v=ba47c84";
+import { clock } from "./workout.js?v=e8f76bb";
 
 const W = 1080, H = 1350;
 const FONT = '"Kanit", system-ui, sans-serif';

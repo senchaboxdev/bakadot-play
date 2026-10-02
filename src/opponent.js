@@ -56,8 +56,9 @@ function proceduralPose(name, time, withClip = false) {
 const PROCEDURAL = ["Punch_Left", "Punch_Right", "HitRecieve", "HitRecieve_2", "Death"];
 
 export class Opponent {
-  static async load(spec) {
-    const gltf = await new GLTFLoader().loadAsync(spec.url);
+  /** onProgress(ProgressEvent) ระหว่างดาวน์โหลดไฟล์โมเดล (ใช้ขึ้น % บนปุ่ม Start) */
+  static async load(spec, onProgress) {
+    const gltf = await new GLTFLoader().loadAsync(spec.url, onProgress);
     return new Opponent(gltf, spec.clips, spec.turn);
   }
 

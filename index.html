@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>BakaDot</title>
-  <meta name="bakadot-version" content="v57 · ba47c84 · 2026-10-02 18:20">
+  <meta name="bakadot-version" content="v58 · e8f76bb · 2026-10-02 18:52">
   <meta name="description" content="Muay Thai workout game you play with your webcam: punch, elbow, knee and guard.">
-  <link rel="stylesheet" href="src/game.css?v=ba47c84">
+  <link rel="stylesheet" href="src/game.css?v=e8f76bb">
   <script type="importmap">
     {
       "imports": {
@@ -15,7 +15,7 @@
       }
     }
   </script>
-  <script type="module" src="src/main.js?v=ba47c84"></script>
+  <script type="module" src="src/main.js?v=e8f76bb"></script>
 </head>
 <body>
   <div id="stage"></div>
@@ -33,8 +33,9 @@
       <div class="weight-label">Body weight (kg) <span>for the calorie estimate</span></div>
       <div class="weight-chips" id="weight"></div>
     </div>
-    <button type="button" id="start-camera">Start (turn on camera)</button>
-    <button type="button" id="start-keys" class="link">Play with the keyboard instead</button>
+    <!-- กดไม่ได้จนกว่าเกมโหลดเสร็จ: main.js เปิดให้กดและใส่ข้อความจริงใน data-label -->
+    <button type="button" id="start-camera" data-label="Start (turn on camera)" disabled>Loading…</button>
+    <button type="button" id="start-keys" class="link" hidden>Play with the keyboard instead</button>
     <p class="note" id="start-note">Camera video is processed on this device only and is never uploaded</p>
   </div>
   <div id="version"></div>
