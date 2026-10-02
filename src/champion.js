@@ -1,6 +1,6 @@
 // ใบผลงานหลังจบไฟต์ (แพ้/ชนะ/แชมป์): ภาพคนเล่นจากกล้อง + ด่านที่ไปถึง + สถิติ ทำเป็นรูป PNG ในเครื่อง
 // ภาพไม่ถูกส่งไปไหนจนกว่าผู้เล่นจะกด Save photo / Share เอง
-import { clock } from "./workout.js?v=07d1cee";
+import { clock } from "./workout.js?v=ba47c84";
 
 const W = 1080, H = 1350;
 const FONT = '"Kanit", system-ui, sans-serif';
@@ -106,14 +106,19 @@ function roundRect(g, x, y, w, h, r) {
 
 export const cardFileName = () => `bakadot-${new Date().toLocaleDateString("sv")}-${new Date().toTimeString().slice(0, 5).replace(":", "")}.png`;
 
-/** บันทึกไฟล์ลงเครื่อง */
-export function savePhoto(blob) {
+const isIOS = () => /iP(ad|hone|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+/** บันทึกไฟล์ลงเครื่อง คืน false ถ้าบันทึกเองไม่ได้ (ให้ผู้เล่นกดค้างที่รูปแทน)
+ *  iOS ไม่สน <a download> จึงเปิดเมนูแชร์ซึ่งมี "Save Image" ลง Photos */
+export async function savePhoto(blob) {
+  if (isIOS()) return sharePhoto(blob);
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: cardFileName() });
   document.body.append(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return true;
 }
 
 /** แชร์ผ่านเมนูแชร์ของเครื่อง (Mail, LINE, AirDrop ...) คืน false ถ้าเบราว์เซอร์นี้แชร์ไฟล์ไม่ได้ */

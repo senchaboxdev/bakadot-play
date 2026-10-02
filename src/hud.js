@@ -1,7 +1,7 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=07d1cee";
-import { clock } from "./workout.js?v=07d1cee";
-import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=07d1cee";
+import { PLAYER_MAX_HP } from "./fight.js?v=ba47c84";
+import { clock } from "./workout.js?v=ba47c84";
+import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=ba47c84";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -244,7 +244,12 @@ export class Hud {
     const note = h("p", "card-note", "The photo stays on this device until you save or share it.");
     const save = h("button", "action", "💾 Save photo");
     save.type = "button";
-    save.addEventListener("click", () => { onAction(); savePhoto(blob); });
+    save.addEventListener("click", async () => {
+      onAction();
+      try {
+        if (!(await savePhoto(blob))) note.textContent = "Press and hold the photo, then tap Save to Photos.";
+      } catch (err) { note.textContent = `Could not save: ${err.message}`; }
+    });
     actions.append(save);
     if (canShareFiles()) {
       const share = h("button", "action share", "📤 Share");
