@@ -8,18 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=605694e";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=605694e";
-import { Gloves } from "./gloves.js?v=605694e";
-import { Effects } from "./effects.js?v=605694e";
-import { GameAudio } from "./audio.js?v=605694e";
-import { Hud } from "./hud.js?v=605694e";
-import { Tweens, lerp } from "./tween.js?v=605694e";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=605694e";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=605694e";
-import { capturePhoto, makeCard } from "./champion.js?v=605694e";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=605694e";
-import { startVision } from "./vision.js?v=605694e";
+import { buildArena, loadEnvironment } from "./arena.js?v=90a4461";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=90a4461";
+import { Gloves } from "./gloves.js?v=90a4461";
+import { Effects } from "./effects.js?v=90a4461";
+import { GameAudio } from "./audio.js?v=90a4461";
+import { Hud } from "./hud.js?v=90a4461";
+import { Tweens, lerp } from "./tween.js?v=90a4461";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=90a4461";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=90a4461";
+import { capturePhoto, makeCard } from "./champion.js?v=90a4461";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=90a4461";
+import { startVision } from "./vision.js?v=90a4461";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -90,22 +90,18 @@ const hud = new Hud(document.getElementById("hud"));
 const gloves = new Gloves(camera);
 
 // ---------- ด่าน (stage progression) ----------
-// ?stage=N starts at stage N. Progress (furthest stage reached) is kept in localStorage.
-const SAVE_KEY = "bakadot.stage";
+// Every visit starts at stage 1 (nothing is remembered between visits); ?stage=N starts at stage N.
+// Old saves from when progress was kept are cleared.
+try { localStorage.removeItem("bakadot.stage"); } catch { /* private mode */ }
 function loadStage() {
   const fromUrl = Number(new URLSearchParams(location.search).get("stage"));
-  if (fromUrl >= 1) return Math.min(fromUrl, STAGES.length) - 1;
-  try { return Math.min(Number(localStorage.getItem(SAVE_KEY)) || 0, STAGES.length - 1); } catch { return 0; }
+  return fromUrl >= 1 ? Math.min(fromUrl, STAGES.length) - 1 : 0;
 }
 /** Fighter data for stage i (0-based), with the stage number in its title. */
 function stageFighter(i) {
   const f = FIGHTERS[STAGES[i]];
   return { ...f, stage: i + 1, title: `Stage ${i + 1} · ${f.title}` };
 }
-function saveStage(i) {
-  try { localStorage.setItem(SAVE_KEY, String(i)); } catch { /* private mode: progress just isn't kept */ }
-}
-
 const state = {
   mode: "menu",
   guarding: false,
@@ -292,7 +288,6 @@ async function onFightFinished(r) {
   if (r.win) {
     // win: next stage next time (after the last one, start over from stage 1)
     state.stage = last ? 0 : state.stage + 1;
-    saveStage(state.stage);
     r.next = last ? null : stageFighter(state.stage);
     r.champion = last;
   }
@@ -559,10 +554,9 @@ function setPaused(on) {
 }
 hud.onPause = () => { if (state.mode === "free" || state.mode === "fight") setPaused(true); };
 hud.onResume = () => setPaused(false);
-// ปุ่ม "Start from Stage 1" ในเมนู: ล้างด่านที่บันทึกไว้แล้วกลับไปด่าน 1
+// ปุ่ม "Start from Stage 1" ในเมนู: กลับไปด่าน 1 (ระหว่างเล่นต่อเนื่องโดยไม่รีเฟรช)
 hud.onRestart = () => {
   state.stage = 0;
-  saveStage(0);
   hud.setNextStage(1, STAGES.length, FIGHTERS[STAGES[0]]);
   arena.setVenue(FIGHTERS[STAGES[0]].venue);
   state.menuLock = MENU_LOCK;

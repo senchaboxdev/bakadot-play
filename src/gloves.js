@@ -1,6 +1,6 @@
 // นวมของผู้เล่น (มุมมองบุรุษที่หนึ่ง ติดกับกล้อง) — ตำแหน่งเป็นเมตรเทียบกล้อง
 import * as THREE from "three";
-import { lerp } from "./tween.js?v=605694e";
+import { lerp } from "./tween.js?v=90a4461";
 
 const REST = { left: [-0.26, -0.34, -0.62], right: [0.26, -0.34, -0.62] };
 const GUARD = { left: [-0.12, -0.14, -0.42], right: [0.12, -0.14, -0.42] };
