@@ -8,18 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=e16d4ca";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=e16d4ca";
-import { Gloves } from "./gloves.js?v=e16d4ca";
-import { Effects } from "./effects.js?v=e16d4ca";
-import { GameAudio } from "./audio.js?v=e16d4ca";
-import { Hud } from "./hud.js?v=e16d4ca";
-import { Tweens, lerp } from "./tween.js?v=e16d4ca";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=e16d4ca";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=e16d4ca";
-import { capturePhoto, makeCard } from "./champion.js?v=e16d4ca";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=e16d4ca";
-import { startVision } from "./vision.js?v=e16d4ca";
+import { buildArena, loadEnvironment } from "./arena.js?v=b695e43";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=b695e43";
+import { Gloves } from "./gloves.js?v=b695e43";
+import { Effects } from "./effects.js?v=b695e43";
+import { GameAudio } from "./audio.js?v=b695e43";
+import { Hud } from "./hud.js?v=b695e43";
+import { Tweens, lerp } from "./tween.js?v=b695e43";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=b695e43";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=b695e43";
+import { capturePhoto, makeCard } from "./champion.js?v=b695e43";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=b695e43";
+import { startVision } from "./vision.js?v=b695e43";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -37,7 +37,8 @@ const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, hp: 40, dodgeChance: 0.12, ge
 const DODGE_COOLDOWN = 1.0;
 const MENU_LOCK = 1.0; // วินาที
 const RESULT_LOCK = 1.5; // วินาที หลังหน้าสรุปผลขึ้น
-const NEXT_FIGHT_IN = 3; // ชนะแล้ว: นับถอยหลังแล้วไปไฟต์ต่อไปเอง (ต่อยซ้าย = กลับเมนู, กด Save/Share = หยุดนับ)
+const NEXT_FIGHT_IN = 3;
+const DODGE_SHIFT = 0.32; // เมตร: กล้อง (หัวผู้เล่น) เลื่อนไปข้างตอนหลบ // ชนะแล้ว: นับถอยหลังแล้วไปไฟต์ต่อไปเอง (ต่อยซ้าย = กลับเมนู, กด Save/Share = หยุดนับ)
 const startScreenShown = () => !document.getElementById("start").hidden;
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
 const OUT_TIME = 0.08; // นวมพุ่งออก
@@ -116,6 +117,8 @@ const state = {
   stage: loadStage(),
   oppState: { guard: false, open: false },
   shake: 0,
+  dodge: null, // null | "left" | "right": ผู้เล่นเอียงหลบอยู่ (หมัดคู่ต่อสู้ไม่โดน)
+  dodgeX: 0, // กล้องเลื่อนไปข้างตามการหลบ (ลื่นๆ)
   menuLock: 0, // วินาทีที่เมนูยังไม่รับการเลือก (หลังเพิ่งเข้าเมนู)
   nextFight: 0, // วินาทีที่เหลือก่อนเริ่มไฟต์ต่อไปเอง (0 = ไม่นับ)
   paused: false, // กดปุ่ม ⏸: ทุกอย่างหยุด (เวลายก คู่ต่อสู้ เวลาออกกำลังกาย) และไม่นับท่า
@@ -185,6 +188,9 @@ function onAction(action) {
   if (action === "camera_on") return void (state.connected = true);
   if (action === "guard_on") return void (state.guarding = true);
   if (action === "guard_off") return void (state.guarding = false);
+  if (action === "dodge_left") return void (state.dodge = "left");
+  if (action === "dodge_right") return void (state.dodge = "right");
+  if (action === "dodge_off") return void (state.dodge = null);
   if (!(action in STRIKE_TYPES) || state.mode === "loading" || state.paused) return;
   if (state.mode === "menu") {
     if (startScreenShown() || state.menuLock > 0) return; // ยังอยู่หน้าเริ่ม / เพิ่งเข้าเมนู: กันหมัดที่ไม่ได้ตั้งใจ
@@ -200,13 +206,18 @@ function onAction(action) {
 }
 
 const KEYS = { j: "punch_left", k: "punch_right", e: "elbow_right", n: "knee_left", m: "knee_right" };
+const DODGE_KEYS = { ArrowLeft: "dodge_left", a: "dodge_left", ArrowRight: "dodge_right", d: "dodge_right" }; // กดค้าง = หลบ
 window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
-  if (e.key === "g") onAction("guard_on");
+  if (DODGE_KEYS[e.key]) onAction(DODGE_KEYS[e.key]);
+  else if (e.key === "g") onAction("guard_on");
   else if (e.key === "Escape") toMenu();
   else if (KEYS[e.key]) onAction(KEYS[e.key]);
 });
-window.addEventListener("keyup", (e) => { if (e.key === "g") onAction("guard_off"); });
+window.addEventListener("keyup", (e) => {
+  if (e.key === "g") onAction("guard_off");
+  else if (DODGE_KEYS[e.key] && state.dodge === DODGE_KEYS[e.key].slice(6)) onAction("dodge_off");
+});
 window.addEventListener("pointerdown", (e) => {
   // เมนู/สรุปผล: แตะครึ่งซ้าย/ขวาของจอ = เหมือนต่อยซ้าย/ขวา
   // (ไม่นับคลิกบนหน้าจอเริ่ม เช่นปุ่ม Start ไม่อย่างนั้นจะเลือกโหมดไปเลย)
@@ -275,6 +286,8 @@ async function startFight(id, overrides = {}) {
     banner: (text, color, seconds) => hud.showBanner(text, color, seconds),
     opponentAttack,
     isGuarding: () => state.guarding,
+    isDodging: () => Boolean(state.dodge),
+    dodged: feedbackDodge,
     block: feedbackBlock,
     playerHit: feedbackPlayerHit,
     opponentState: (s) => (state.oppState = s),
@@ -443,6 +456,7 @@ async function freeAttack() {
   if (state.free.down) return void (state.attackTimer = 1);
   await opponentAttack(FREE.warn, () => {
     if (state.mode !== "free") return;
+    if (state.dodge) return feedbackDodge();
     if (state.guarding) return feedbackBlock();
     state.free.hitsTaken += 1;
     feedbackPlayerHit();
@@ -454,6 +468,11 @@ function feedbackBlock(chip) {
   audio.play("block");
   hud.message(chip ? `BLOCKED!  -${chip}` : "BLOCKED!", "#4fc3f7");
   state.shake = Math.max(state.shake, 0.02);
+}
+
+function feedbackDodge() {
+  hud.message("DODGE!", "#7CFC9A");
+  arena.cheer(0.4);
 }
 
 function feedbackPlayerHit(amount) {
@@ -495,8 +514,12 @@ renderer.setAnimationLoop(() => {
     if (state.attackTimer <= 0) freeAttack();
   }
 
-  // สั่นกล้องตอนโดน/กัน
+  // สั่นกล้องตอนโดน/กัน + เลื่อนกล้องไปข้างตอนหลบ
   camera.position.copy(CAMERA_HOME);
+  const dodgeTarget = state.dodge === "left" ? -DODGE_SHIFT : state.dodge === "right" ? DODGE_SHIFT : 0;
+  state.dodgeX += (dodgeTarget - state.dodgeX) * Math.min(dt * 14, 1);
+  camera.position.x += state.dodgeX;
+  camera.rotation.z = -state.dodgeX * 0.35; // เอียงหัวตามทางที่หลบ
   if (state.shake > 0) {
     camera.position.x += (Math.random() * 2 - 1) * state.shake;
     camera.position.y += (Math.random() * 2 - 1) * state.shake;

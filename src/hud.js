@@ -1,7 +1,7 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=e16d4ca";
-import { clock } from "./workout.js?v=e16d4ca";
-import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=e16d4ca";
+import { PLAYER_MAX_HP } from "./fight.js?v=b695e43";
+import { clock } from "./workout.js?v=b695e43";
+import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=b695e43";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
@@ -107,7 +107,7 @@ export class Hud {
       return c;
     };
     row.append(
-      card("left", "Free Play", "Throw punches, elbows and knees. Guard when you hear \"Guard!\"."),
+      card("left", "Free Play", "Throw punches, elbows and knees. Guard or lean left/right to dodge when you hear \"Guard!\"."),
       (this.storyCard = card("right", "Road of the Nak Muay", "")),
     );
     menu.append(row, this.buildRestart());
@@ -183,7 +183,7 @@ export class Hud {
       this.roundEl.classList.toggle("rest", fight.phase === "rest");
     }
     this.guardEl.classList.toggle("on", guarding && (this.mode === "free" || this.mode === "fight"));
-    this.status.textContent = connected ? "Camera connected" : "Camera off · keys: J/K punch · E elbow · N knee · hold G guard";
+    this.status.textContent = connected ? "Camera connected" : "Camera off · keys: J/K punch · E elbow · N knee · hold G guard · hold ←/→ dodge";
     this.status.classList.toggle("ok", connected);
   }
 
@@ -256,7 +256,7 @@ export class Hud {
     const stats = h("div", "stats");
     for (const [label, value] of [
       ["Punches", r.punch], ["Elbows", r.elbow], ["Knees", r.knee],
-      ["Blocks", r.blocks], ["Hits taken", r.hitsTaken], ["Open hits", r.openHits],
+      ["Blocks", r.blocks], ["Dodges", r.slips ?? 0], ["Hits taken", r.hitsTaken], ["Open hits", r.openHits],
     ]) {
       const s = h("div", "stat");
       s.append(h("b", "", String(value)), h("span", "", label));

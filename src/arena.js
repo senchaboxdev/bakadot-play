@@ -6,7 +6,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
-import { FLOOR_Y, SPARK, VENUES, canvasTexture, makeSky } from "./venues.js?v=e16d4ca";
+import { FLOOR_Y, SPARK, VENUES, canvasTexture, makeSky } from "./venues.js?v=b695e43";
 
 export const RING_SIZE = 6.0;
 const HALF = RING_SIZE / 2;

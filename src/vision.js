@@ -1,8 +1,8 @@
 // กล้อง + MediaPipe Pose (ในเบราว์เซอร์) + ตัวตรวจจับอาวุธ -> ส่ง action ให้เกม (onAction)
-// action: "punch_left", "elbow_right", "knee_left", "guard_on", "guard_off", "camera_on"
+// action: "punch_left", "elbow_right", "knee_left", "guard_on", "guard_off", "dodge_left", "dodge_right", "dodge_off", "camera_on"
 // ภาพจากกล้องประมวลผลในเครื่องนี้เท่านั้น
 import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
-import { ARM_LANDMARKS, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=e16d4ca";
+import { ARM_LANDMARKS, DodgeDetector, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=b695e43";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
 const MODEL_URL = "models/pose_landmarker_full.task";
@@ -55,6 +55,7 @@ export async function startVision(onAction) {
 
   const detector = new StrikeDetector();
   const guard = new GuardDetector();
+  const dodge = new DodgeDetector();
   const lastStrike = { LEFT: { t: -1e9, kind: "" }, RIGHT: { t: -1e9, kind: "" } };
   let announced = false;
   let lastVideoTime = -1;
@@ -86,13 +87,15 @@ export async function startVision(onAction) {
       // ใกล้กล้องเกิน: ไม่คิดเรื่องการ์ด (ส่ง null = มองไม่เห็น -> หลุดการ์ด)
       const guardEvent = guard.update(detector.blocked ? null : img, aspect, detector.scale, t);
       if (guardEvent) onAction(guardEvent.toLowerCase());
+      const dodgeEvent = dodge.update(detector.blocked ? null : img, t);
+      if (dodgeEvent) onAction(dodgeEvent.toLowerCase());
       if (img && !announced) {
         announced = true;
         onAction("camera_on");
       }
       fps = 0.9 * fps + 0.1 * (1000 / Math.max(nowMs - lastFrameAt, 1));
       lastFrameAt = nowMs;
-      draw(ui, img, t, detector, guard, lastStrike, fps);
+      draw(ui, img, t, detector, guard, dodge, lastStrike, fps);
     }
   };
   loop();
@@ -103,7 +106,7 @@ function normalize(lms) {
   return lms.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility ?? 1 }));
 }
 
-function draw(ui, img, t, detector, guard, lastStrike, fps) {
+function draw(ui, img, t, detector, guard, dodge, lastStrike, fps) {
   const { canvas, ctx } = ui;
   const w = (canvas.width = ui.video.videoWidth || 640);
   const h = (canvas.height = ui.video.videoHeight || 480);
@@ -134,7 +137,7 @@ function draw(ui, img, t, detector, guard, lastStrike, fps) {
   const flashes = ["LEFT", "RIGHT"]
     .filter((s) => (t - lastStrike[s].t) * 1000 < FLASH_MS)
     .map((s) => LABELS[lastStrike[s].kind]);
-  ui.status.textContent = [guard.active ? "Guard" : "", ...flashes, `${Math.round(fps)} fps`].filter(Boolean).join("  ·  ");
+  ui.status.textContent = [guard.active ? "Guard" : "", dodge.side ? `Dodge ${dodge.side.toLowerCase()}` : "", ...flashes, `${Math.round(fps)} fps`].filter(Boolean).join("  ·  ");
 }
 
 function line(ctx, a, b, w, h) {

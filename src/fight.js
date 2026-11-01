@@ -8,6 +8,7 @@
 //   banner(text, color, seconds)
 //   opponentAttack(warnSeconds, onImpact) -> Promise (เล่นท่าบุก เรียก onImpact ตอนหมัดถึง)
 //   isGuarding() -> bool
+//   isDodging() -> bool (ไม่ใส่ = หลบไม่ได้) / dodged() ผู้เล่นหลบหมัดพ้น
 //   block(chipDamage) / playerHit(damage)
 //   opponentState({ guard, open })
 //   finished(result)
@@ -32,7 +33,7 @@ export class Fight {
     this.playerHp = PLAYER_MAX_HP;
     this.round = 1;
     this.elapsed = 0;
-    this.stats = { punch: 0, elbow: 0, knee: 0, kick: 0, blocks: 0, hitsTaken: 0, openHits: 0 };
+    this.stats = { punch: 0, elbow: 0, knee: 0, kick: 0, blocks: 0, slips: 0, hitsTaken: 0, openHits: 0 };
     this.done = false;
     this.beginRound();
   }
@@ -104,6 +105,12 @@ export class Fight {
 
   resolveAttack() {
     if (!this.active) return;
+    if (this.hooks.isDodging?.()) {
+      // หลบพ้น: ไม่เสียเลือดเลย (ดีกว่าการ์ดที่ยังเสียนิดหน่อย)
+      this.stats.slips += 1;
+      this.hooks.dodged?.();
+      return;
+    }
     if (this.hooks.isGuarding()) {
       const chip = Math.round(this.f.damage * BLOCK_CHIP * 10) / 10;
       this.stats.blocks += 1;

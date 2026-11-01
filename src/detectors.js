@@ -469,3 +469,68 @@ function wristToNose(img, aspect, scale, minVisibility) {
   }
   return far;
 }
+
+// ---------- หลบ (เอียงหัว/ตัวไปซ้ายหรือขวา) — มีเฉพาะบนเว็บ ยังไม่มีฝั่ง Python ----------
+// วัดหัว (จมูก) เทียบกึ่งกลางสะโพก ในหน่วยความกว้างไหล่ (ถ้าไม่เห็นสะโพกใช้กึ่งกลางไหล่แทน)
+// ทิศ "ซ้าย/ขวา" ตามตัวผู้เล่นจริง (เทียบทิศไหล่ขวา -> ไหล่ซ้าย) จึงไม่ขึ้นกับว่าภาพกลับด้านหรือไม่
+// ท่ายืนปกติของแต่ละคนไม่ตรงกลางเป๊ะ: เก็บค่ากลาง (baseline) ช้าๆ ตอนยืนนิ่งไม่ได้เอียง
+
+export function dodgeConfig(overrides = {}) {
+  return {
+    onLean: 0.4, // เอียงเกินนี้ (ความกว้างไหล่) = หลบ
+    offLean: 0.2, // กลับมาน้อยกว่านี้ = เลิกหลบ
+    baselineRate: 0.5, // ต่อวินาที: ค่ากลางตามท่ายืนปกติเร็วแค่ไหน
+    maxGap: 0.3,
+    minVisibility: 0.5,
+    ...overrides,
+  };
+}
+
+export class DodgeDetector {
+  constructor(cfg = dodgeConfig()) {
+    this.cfg = cfg;
+    this.side = null; // null | LEFT | RIGHT
+    this.baseline = null;
+    this.lastSeen = null;
+    this.lean = 0;
+  }
+
+  /** คืน "DODGE_LEFT" / "DODGE_RIGHT" / "DODGE_OFF" เมื่อสถานะเปลี่ยน ไม่เปลี่ยนคืน null */
+  update(img, t) {
+    const cfg = this.cfg;
+    const raw = img ? leanOf(img, cfg.minVisibility) : null;
+    if (raw === null) {
+      const lost = this.lastSeen === null || t - this.lastSeen > cfg.maxGap;
+      return this.side && lost ? this.set(null) : null;
+    }
+    const dt = this.lastSeen === null ? 0 : Math.min(t - this.lastSeen, 0.2);
+    this.lastSeen = t;
+    if (this.baseline === null) this.baseline = raw;
+    const lean = raw - this.baseline;
+    this.lean = lean;
+    if (Math.abs(lean) < cfg.offLean) this.baseline += (raw - this.baseline) * Math.min(cfg.baselineRate * dt, 1);
+    if (this.side) {
+      const still = this.side === LEFT ? lean > cfg.offLean : lean < -cfg.offLean;
+      return still ? null : this.set(null);
+    }
+    if (lean >= cfg.onLean) return this.set(LEFT);
+    if (lean <= -cfg.onLean) return this.set(RIGHT);
+    return null;
+  }
+
+  set(side) {
+    this.side = side;
+    return side ? `DODGE_${side}` : "DODGE_OFF";
+  }
+}
+
+/** หัวเอียงไปทางซ้ายของผู้เล่นเท่าไร (บวก = ซ้าย, ลบ = ขวา) หน่วยความกว้างไหล่ หรือ null ถ้ามองไม่ชัด */
+function leanOf(img, minVisibility) {
+  const nose = img[NOSE], ls = img[L_SHOULDER], rs = img[R_SHOULDER];
+  if (!visible(minVisibility, nose, ls, rs)) return null;
+  const width = ls.x - rs.x; // มีเครื่องหมาย: ชี้จากไหล่ขวาไปไหล่ซ้าย
+  if (Math.abs(width) < 0.02) return null; // ยืนหันข้าง
+  const lh = img[L_HIP], rh = img[R_HIP];
+  const center = visible(minVisibility, lh, rh) ? (lh.x + rh.x) / 2 : (ls.x + rs.x) / 2;
+  return (nose.x - center) / width;
+}
