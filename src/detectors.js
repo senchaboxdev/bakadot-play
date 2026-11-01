@@ -470,16 +470,18 @@ function wristToNose(img, aspect, scale, minVisibility) {
   return far;
 }
 
-// ---------- หลบ (เอียงหัว/ตัวไปซ้ายหรือขวา) — มีเฉพาะบนเว็บ ยังไม่มีฝั่ง Python ----------
-// วัดหัว (จมูก) เทียบกึ่งกลางสะโพก ในหน่วยความกว้างไหล่ (ถ้าไม่เห็นสะโพกใช้กึ่งกลางไหล่แทน)
+// ---------- หลบ (เอียงหัว/ตัว หรือก้าว ไปซ้ายหรือขวา) — มีเฉพาะบนเว็บ ยังไม่มีฝั่ง Python ----------
+// วัดว่าหัว (จมูก) ออกจากตำแหน่งปกติไปข้างเท่าไร ในหน่วยความกว้างไหล่ — เอียงตัวหรือก้าวหลบก็นับ
+// ตำแหน่งปกติ (baseline) และความกว้างไหล่ เก็บค่าเฉลี่ยช้าๆ ตอนไม่ได้หลบ (ยืนขยับที่ไปเรื่อยๆ ได้)
 // ทิศ "ซ้าย/ขวา" ตามตัวผู้เล่นจริง (เทียบทิศไหล่ขวา -> ไหล่ซ้าย) จึงไม่ขึ้นกับว่าภาพกลับด้านหรือไม่
-// ท่ายืนปกติของแต่ละคนไม่ตรงกลางเป๊ะ: เก็บค่ากลาง (baseline) ช้าๆ ตอนยืนนิ่งไม่ได้เอียง
 
 export function dodgeConfig(overrides = {}) {
   return {
-    onLean: 0.4, // เอียงเกินนี้ (ความกว้างไหล่) = หลบ
-    offLean: 0.2, // กลับมาน้อยกว่านี้ = เลิกหลบ
-    baselineRate: 0.5, // ต่อวินาที: ค่ากลางตามท่ายืนปกติเร็วแค่ไหน
+    onLean: 0.25, // หัวออกไปข้างเกินนี้ (ความกว้างไหล่) = หลบ
+    offLean: 0.12, // กลับมาน้อยกว่านี้ = เลิกหลบ
+    maxHold: 1.5, // วินาที: หลบค้างนานกว่านี้ = ย้ายที่ยืน ไม่ใช่หลบ (ตำแหน่งปกติย้ายตาม แล้วเลิกหลบ)
+    strikeBreak: 0.5, // วินาทีหลังออกอาวุธ: ไม่เริ่มหลบ (ตัวบิดตอนต่อยไม่ใช่การหลบ)
+    baselineRate: 0.6, // ต่อวินาที: ตำแหน่งปกติตามตัวผู้เล่นเร็วแค่ไหน (ตอนไม่ได้หลบ)
     maxGap: 0.3,
     minVisibility: 0.5,
     ...overrides,
@@ -490,47 +492,62 @@ export class DodgeDetector {
   constructor(cfg = dodgeConfig()) {
     this.cfg = cfg;
     this.side = null; // null | LEFT | RIGHT
-    this.baseline = null;
+    this.homeX = null; // ตำแหน่งหัวปกติบนภาพ
+    this.width = null; // ความกว้างไหล่ปกติ (มีเครื่องหมาย: ไหล่ขวา -> ไหล่ซ้าย)
     this.lastSeen = null;
     this.lean = 0;
+    this.lastStrike = -Infinity;
+    this.since = 0;
   }
+
+  notifyStrike(t) { this.lastStrike = t; }
 
   /** คืน "DODGE_LEFT" / "DODGE_RIGHT" / "DODGE_OFF" เมื่อสถานะเปลี่ยน ไม่เปลี่ยนคืน null */
   update(img, t) {
     const cfg = this.cfg;
-    const raw = img ? leanOf(img, cfg.minVisibility) : null;
-    if (raw === null) {
+    const seen = img ? headAndWidth(img, cfg.minVisibility) : null;
+    if (seen === null) {
       const lost = this.lastSeen === null || t - this.lastSeen > cfg.maxGap;
+      if (lost) this.homeX = null; // หายไปนาน: เริ่มวัดตำแหน่งปกติใหม่
       return this.side && lost ? this.set(null) : null;
     }
     const dt = this.lastSeen === null ? 0 : Math.min(t - this.lastSeen, 0.2);
     this.lastSeen = t;
-    if (this.baseline === null) this.baseline = raw;
-    const lean = raw - this.baseline;
+    if (this.homeX === null) { this.homeX = seen.x; this.width = seen.width; }
+    const lean = (seen.x - this.homeX) / this.width; // บวก = ไปทางซ้ายของผู้เล่น
     this.lean = lean;
-    if (Math.abs(lean) < cfg.offLean) this.baseline += (raw - this.baseline) * Math.min(cfg.baselineRate * dt, 1);
+    if (!this.side && Math.abs(lean) < cfg.offLean) {
+      const k = Math.min(cfg.baselineRate * dt, 1);
+      this.homeX += (seen.x - this.homeX) * k;
+      this.width += (seen.width - this.width) * k;
+    }
     if (this.side) {
+      if (t - this.since > cfg.maxHold) {
+        this.homeX = seen.x;
+        this.width = seen.width;
+        return this.set(null);
+      }
       const still = this.side === LEFT ? lean > cfg.offLean : lean < -cfg.offLean;
       return still ? null : this.set(null);
     }
-    if (lean >= cfg.onLean) return this.set(LEFT);
-    if (lean <= -cfg.onLean) return this.set(RIGHT);
+    if (t - this.lastStrike < cfg.strikeBreak) return null;
+    if (lean >= cfg.onLean) return this.set(LEFT, t);
+    if (lean <= -cfg.onLean) return this.set(RIGHT, t);
     return null;
   }
 
-  set(side) {
+  set(side, t) {
     this.side = side;
+    this.since = t;
     return side ? `DODGE_${side}` : "DODGE_OFF";
   }
 }
 
-/** หัวเอียงไปทางซ้ายของผู้เล่นเท่าไร (บวก = ซ้าย, ลบ = ขวา) หน่วยความกว้างไหล่ หรือ null ถ้ามองไม่ชัด */
-function leanOf(img, minVisibility) {
+/** ตำแหน่งหัวบนภาพ + ความกว้างไหล่ (มีเครื่องหมาย) หรือ null ถ้ามองไม่ชัด/ยืนหันข้าง */
+function headAndWidth(img, minVisibility) {
   const nose = img[NOSE], ls = img[L_SHOULDER], rs = img[R_SHOULDER];
   if (!visible(minVisibility, nose, ls, rs)) return null;
-  const width = ls.x - rs.x; // มีเครื่องหมาย: ชี้จากไหล่ขวาไปไหล่ซ้าย
-  if (Math.abs(width) < 0.02) return null; // ยืนหันข้าง
-  const lh = img[L_HIP], rh = img[R_HIP];
-  const center = visible(minVisibility, lh, rh) ? (lh.x + rh.x) / 2 : (ls.x + rs.x) / 2;
-  return (nose.x - center) / width;
+  const width = ls.x - rs.x;
+  if (Math.abs(width) < 0.02) return null;
+  return { x: nose.x, width };
 }
