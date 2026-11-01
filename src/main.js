@@ -8,18 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=d8186c6";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=d8186c6";
-import { Gloves } from "./gloves.js?v=d8186c6";
-import { Effects } from "./effects.js?v=d8186c6";
-import { GameAudio } from "./audio.js?v=d8186c6";
-import { Hud } from "./hud.js?v=d8186c6";
-import { Tweens, lerp } from "./tween.js?v=d8186c6";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=d8186c6";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=d8186c6";
-import { capturePhoto, makeCard } from "./champion.js?v=d8186c6";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=d8186c6";
-import { startVision } from "./vision.js?v=d8186c6";
+import { buildArena, loadEnvironment } from "./arena.js?v=605694e";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=605694e";
+import { Gloves } from "./gloves.js?v=605694e";
+import { Effects } from "./effects.js?v=605694e";
+import { GameAudio } from "./audio.js?v=605694e";
+import { Hud } from "./hud.js?v=605694e";
+import { Tweens, lerp } from "./tween.js?v=605694e";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=605694e";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=605694e";
+import { capturePhoto, makeCard } from "./champion.js?v=605694e";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=605694e";
+import { startVision } from "./vision.js?v=605694e";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -307,7 +307,7 @@ async function onFightFinished(r) {
     hud.showBanner(r.how === "KO" ? "K.O." : "YOU LOSE", "#ff5252", 1.8);
   }
   await tweens.wait(1.9);
-  if (state.mode === "result") r.card = await resultPhoto(r);
+  if (state.mode === "result" && r.champion) r.card = await resultPhoto(r); // ถ่ายรูปเฉพาะตอนชนะครบทุกด่าน
   if (state.mode === "result") {
     r.onPhotoAction = () => { state.nextFight = 0; hud.nextFightIn(0); }; // กำลังแชร์: ไม่ข้ามไปไฟต์ต่อไปเอง
     hud.showResult(r);
@@ -404,7 +404,7 @@ async function opponentAttack(warn, onImpact) {
   state.attacking = false;
 }
 
-/** จบไฟต์ (แพ้หรือชนะ): นับ 3-2-1 ถ่ายภาพจากกล้อง แล้วทำใบผลงานบอกด่านที่ไปถึง (ภาพอยู่ในเครื่องเท่านั้น) */
+/** ชนะครบทุกด่าน (แชมป์): นับ 3-2-1 ถ่ายภาพจากกล้อง แล้วทำใบผลงานบอกด่านที่ไปถึง (ภาพอยู่ในเครื่องเท่านั้น) */
 async function resultPhoto(r) {
   for (const text of ["PHOTO!", "3", "2", "1"]) {
     hud.showBanner(text, "#ffd400", 0.75);
