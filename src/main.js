@@ -8,18 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=43349ea";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=43349ea";
-import { Gloves } from "./gloves.js?v=43349ea";
-import { Effects } from "./effects.js?v=43349ea";
-import { GameAudio } from "./audio.js?v=43349ea";
-import { Hud } from "./hud.js?v=43349ea";
-import { Tweens, lerp } from "./tween.js?v=43349ea";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=43349ea";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=43349ea";
-import { capturePhoto, makeCard } from "./champion.js?v=43349ea";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=43349ea";
-import { startVision } from "./vision.js?v=43349ea";
+import { buildArena, loadEnvironment } from "./arena.js?v=f4a0f1c";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=f4a0f1c";
+import { Gloves } from "./gloves.js?v=f4a0f1c";
+import { Effects } from "./effects.js?v=f4a0f1c";
+import { GameAudio } from "./audio.js?v=f4a0f1c";
+import { Hud } from "./hud.js?v=f4a0f1c";
+import { Tweens, lerp } from "./tween.js?v=f4a0f1c";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=f4a0f1c";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=f4a0f1c";
+import { capturePhoto, makeCard } from "./champion.js?v=f4a0f1c";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=f4a0f1c";
+import { startVision } from "./vision.js?v=f4a0f1c";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -494,7 +494,7 @@ renderer.setAnimationLoop(() => {
   opponent.update(dt);
   fx.update(dt);
   arena.update(dt);
-  gloves.update(dt, state.guarding);
+  gloves.update(dt, state.guarding, state.dodge);
 
   if (state.mode === "fight") state.fight?.update(dt);
   state.free.dodgeWait = Math.max(state.free.dodgeWait - dt, 0);

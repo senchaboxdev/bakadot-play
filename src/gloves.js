@@ -1,9 +1,11 @@
 // นวมของผู้เล่น (มุมมองบุรุษที่หนึ่ง ติดกับกล้อง) — ตำแหน่งเป็นเมตรเทียบกล้อง
 import * as THREE from "three";
-import { lerp } from "./tween.js?v=43349ea";
+import { lerp } from "./tween.js?v=f4a0f1c";
 
 const REST = { left: [-0.26, -0.34, -0.62], right: [0.26, -0.34, -0.62] };
 const GUARD = { left: [-0.12, -0.14, -0.42], right: [0.12, -0.14, -0.42] };
+// หลบ: มือลดต่ำลงแนบตัว (ไม่ได้ยกบังหน้าแบบการ์ด) — ทิศที่หลบจัดการด้วยการเลื่อนกล้องอยู่แล้ว
+const DODGE = { left: [-0.3, -0.33, -0.6], right: [0.3, -0.33, -0.6] };
 const HIT = { left: [-0.07, -0.02, -1.25], right: [0.07, -0.02, -1.25] };
 
 const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.45 });
@@ -32,15 +34,24 @@ export class Gloves {
     this.meshes = { left: makeGlove(true), right: makeGlove(false) };
     this.out = { left: 0, right: 0 }; // 0 = ท่าพัก/การ์ด, 1 = เหยียดสุด
     this.guard = 0; // 0 = มือล่าง, 1 = ยกบังหน้า
+    this.dodge = 0; // 0 = ปกติ, 1 = หลบ (มือลดลง ทับท่าการ์ด)
+    this.dodgeSide = 0; // -1 = หลบซ้าย, 1 = หลบขวา (นวมเอียงตาม)
     for (const g of Object.values(this.meshes)) camera.add(g);
   }
 
-  update(dt, guarding) {
-    const target = guarding ? 1 : 0;
-    this.guard += Math.sign(target - this.guard) * Math.min(Math.abs(target - this.guard), dt * 8);
+  /** dodge: null | "left" | "right" */
+  update(dt, guarding, dodge = null) {
+    const approach = (v, target, rate) => v + Math.sign(target - v) * Math.min(Math.abs(target - v), dt * rate);
+    this.guard = approach(this.guard, guarding ? 1 : 0, 8);
+    this.dodge = approach(this.dodge, dodge ? 1 : 0, 10);
+    if (dodge) this.dodgeSide = dodge === "left" ? -1 : 1;
     for (const side of ["left", "right"]) {
-      const p = [0, 1, 2].map((i) => lerp(lerp(REST[side][i], GUARD[side][i], this.guard), HIT[side][i], this.out[side]));
+      const p = [0, 1, 2].map((i) => {
+        const stance = lerp(lerp(REST[side][i], GUARD[side][i], this.guard), DODGE[side][i], this.dodge);
+        return lerp(stance, HIT[side][i], this.out[side]);
+      });
       this.meshes[side].position.set(...p);
+      this.meshes[side].rotation.z = this.dodgeSide * this.dodge * 0.5; // นวมเอียงไปทางที่หลบ
     }
   }
 }

@@ -2,7 +2,7 @@
 // action: "punch_left", "elbow_right", "knee_left", "guard_on", "guard_off", "dodge_left", "dodge_right", "dodge_off", "camera_on"
 // ภาพจากกล้องประมวลผลในเครื่องนี้เท่านั้น
 import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
-import { ARM_LANDMARKS, DodgeDetector, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=43349ea";
+import { ARM_LANDMARKS, DodgeDetector, GuardDetector, StrikeDetector, framingHint } from "./detectors.js?v=f4a0f1c";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
 const MODEL_URL = "models/pose_landmarker_full.task";

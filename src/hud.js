@@ -1,7 +1,7 @@
 // HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=43349ea";
-import { clock } from "./workout.js?v=43349ea";
-import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=43349ea";
+import { PLAYER_MAX_HP } from "./fight.js?v=f4a0f1c";
+import { clock } from "./workout.js?v=f4a0f1c";
+import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=f4a0f1c";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
 const ORDER = ["punch", "elbow", "knee", "kick"];
