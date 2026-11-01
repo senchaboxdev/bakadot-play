@@ -8,18 +8,18 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { buildArena, loadEnvironment } from "./arena.js?v=90a4461";
-import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=90a4461";
-import { Gloves } from "./gloves.js?v=90a4461";
-import { Effects } from "./effects.js?v=90a4461";
-import { GameAudio } from "./audio.js?v=90a4461";
-import { Hud } from "./hud.js?v=90a4461";
-import { Tweens, lerp } from "./tween.js?v=90a4461";
-import { Fight, WEAPON_DAMAGE } from "./fight.js?v=90a4461";
-import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=90a4461";
-import { capturePhoto, makeCard } from "./champion.js?v=90a4461";
-import { FIGHTERS, STAGES } from "./data/fighters.js?v=90a4461";
-import { startVision } from "./vision.js?v=90a4461";
+import { buildArena, loadEnvironment } from "./arena.js?v=e16d4ca";
+import { Opponent, OPPONENT_HEIGHT, OPPONENT_MODELS } from "./opponent.js?v=e16d4ca";
+import { Gloves } from "./gloves.js?v=e16d4ca";
+import { Effects } from "./effects.js?v=e16d4ca";
+import { GameAudio } from "./audio.js?v=e16d4ca";
+import { Hud } from "./hud.js?v=e16d4ca";
+import { Tweens, lerp } from "./tween.js?v=e16d4ca";
+import { Fight, WEAPON_DAMAGE } from "./fight.js?v=e16d4ca";
+import { Workout, DEFAULT_WEIGHT, loadWeight, saveWeight } from "./workout.js?v=e16d4ca";
+import { capturePhoto, makeCard } from "./champion.js?v=e16d4ca";
+import { FIGHTERS, STAGES } from "./data/fighters.js?v=e16d4ca";
+import { startVision } from "./vision.js?v=e16d4ca";
 
 /** localStorage, or a stand-in when the browser blocks it (private mode) */
 function localStorageSafe() {
@@ -37,7 +37,7 @@ const FREE = { attackEvery: [3.5, 6.5], warn: 1.0, hp: 40, dodgeChance: 0.12, ge
 const DODGE_COOLDOWN = 1.0;
 const MENU_LOCK = 1.0; // วินาที
 const RESULT_LOCK = 1.5; // วินาที หลังหน้าสรุปผลขึ้น
-const NEXT_FIGHT_IN = 6; // ชนะแล้ว: นับถอยหลังแล้วไปไฟต์ต่อไปเอง (ต่อยซ้าย = กลับเมนู, กด Save/Share = หยุดนับ)
+const NEXT_FIGHT_IN = 3; // ชนะแล้ว: นับถอยหลังแล้วไปไฟต์ต่อไปเอง (ต่อยซ้าย = กลับเมนู, กด Save/Share = หยุดนับ)
 const startScreenShown = () => !document.getElementById("start").hidden;
 const STEP_IN = 0.55; // เมตร ที่คู่ต่อสู้ก้าวเข้ามาตอนบุก
 const OUT_TIME = 0.08; // นวมพุ่งออก
@@ -265,6 +265,8 @@ async function startFight(id, overrides = {}) {
   state.mode = "loading";
   await showOpponent(fighter.model);
   arena.setVenue(fighter.venue);
+  const nextId = STAGES[STAGES.indexOf(id) + 1];
+  if (nextId) loadOpponent(FIGHTERS[nextId].model); // โหลดคู่ต่อสู้ด่านถัดไประหว่างไฟต์นี้: ชนะแล้วเริ่มได้ทันที
   state.workout.mark();
   state.mode = "fight";
   opponent.setShorts(fighter.shorts);
@@ -301,7 +303,7 @@ async function onFightFinished(r) {
   } else {
     hud.showBanner(r.how === "KO" ? "K.O." : "YOU LOSE", "#ff5252", 1.8);
   }
-  await tweens.wait(1.9);
+  await tweens.wait(1.3);
   if (state.mode === "result" && r.champion) r.card = await resultPhoto(r); // ถ่ายรูปเฉพาะตอนชนะครบทุกด่าน
   if (state.mode === "result") {
     r.onPhotoAction = () => { state.nextFight = 0; hud.nextFightIn(0); }; // กำลังแชร์: ไม่ข้ามไปไฟต์ต่อไปเอง
