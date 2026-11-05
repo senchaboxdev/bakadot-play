@@ -1,10 +1,9 @@
-// HUD (HTML ซ้อนบนฉาก 3D): เมนู / เล่นอิสระ / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
-import { PLAYER_MAX_HP } from "./fight.js?v=f4a0f1c";
-import { clock } from "./workout.js?v=f4a0f1c";
-import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=f4a0f1c";
+// HUD (HTML ซ้อนบนฉาก 3D): เมนู / ประลอง / สรุปผล + ป้ายและข้อความต่างๆ
+import { PLAYER_MAX_HP } from "./fight.js?v=6c31a8e";
+import { clock } from "./workout.js?v=6c31a8e";
+import { savePhoto, sharePhoto, canShareFiles } from "./champion.js?v=6c31a8e";
 
 const NAMES = { punch: "Punch", elbow: "Elbow", knee: "Knee", kick: "Kick" };
-const ORDER = ["punch", "elbow", "knee", "kick"];
 
 const h = (tag, cls, text) => {
   const el = document.createElement(tag);
@@ -32,19 +31,6 @@ export class Hud {
   constructor(root) {
     this.root = root;
     root.innerHTML = "";
-
-    // --- เล่นอิสระ (ซ้อม): หลอดเลือดคู่ซ้อม + น็อก/หมัด/โดนต่อย + นับแต่ละอาวุธ ---
-    this.freePanel = h("div", "panel free-panel");
-    this.freeHp = h("div", "hp opp free-hp");
-    this.freeHp.fill = h("div", "hp-fill");
-    this.freeHp.trail = h("div", "hp-trail");
-    this.freeHp.wrap = this.freeHp;
-    const freeBar = h("div", "hp-bar");
-    freeBar.append(this.freeHp.trail, this.freeHp.fill);
-    this.freeHp.append(h("div", "free-title", "SPARRING"), freeBar);
-    this.scoreEl = h("div", "score");
-    this.countsEl = h("div", "counts");
-    this.freePanel.append(this.freeHp, this.scoreEl, this.countsEl);
 
     // --- เวลาออกกำลังกาย + แคลอรี (ระหว่างเล่น) ---
     this.workoutEl = h("div", "workout");
@@ -91,7 +77,7 @@ export class Hud {
     this.pausedEl.append(h("h1", "", "Paused"), h("p", "sub", "Tap to continue"));
     this.pausedEl.addEventListener("click", () => this.onResume());
 
-    root.append(this.flash, this.freePanel, this.workoutEl, this.fightPanel, this.oppTag, this.banner, this.pop,
+    root.append(this.flash, this.workoutEl, this.fightPanel, this.oppTag, this.banner, this.pop,
       this.warnBox, this.msg, this.status, this.guardEl, this.menu, this.result, this.pauseBtn, this.pausedEl);
     this.setMode("menu");
   }
@@ -99,17 +85,11 @@ export class Hud {
   buildMenu() {
     const menu = h("div", "screen menu");
     this.sessionEl = h("p", "today");
-    menu.append(h("h1", "", "BakaDot"), h("p", "sub", "Punch LEFT or RIGHT to choose"), this.sessionEl);
+    menu.append(h("h1", "", "BakaDot"), h("p", "sub", "Punch to start"), this.sessionEl);
     const row = h("div", "cards");
-    const card = (side, title, text) => {
-      const c = h("div", `card ${side}`);
-      c.append(h("div", "card-key", side === "left" ? "◀ Punch LEFT" : "Punch RIGHT ▶"), h("h2", "", title), h("p", "", text));
-      return c;
-    };
-    row.append(
-      card("left", "Free Play", "Throw punches, elbows and knees. Guard or lean left/right to dodge when you hear \"Guard!\"."),
-      (this.storyCard = card("right", "Road of the Nak Muay", "")),
-    );
+    this.storyCard = h("div", "card right");
+    this.storyCard.append(h("div", "card-key", "👊 Punch to fight"), h("h2", "", "Road of the Nak Muay"), h("p", "", ""));
+    row.append(this.storyCard);
     menu.append(row, this.buildRestart());
     return menu;
   }
@@ -164,12 +144,7 @@ export class Hud {
     this.warnBox.classList.remove("on");
   }
 
-  update({ score, counts, guarding, connected, fight, free, workout }) {
-    if (this.mode === "free") {
-      setHp(this.freeHp, free.hp / free.max);
-      this.scoreEl.textContent = `KO ${free.kos}   ·   STRIKES ${score}   ·   HITS TAKEN ${free.hitsTaken}`;
-      this.countsEl.textContent = ORDER.map((k) => `${NAMES[k]} ${counts[k] ?? 0}`).join("   ");
-    }
+  update({ guarding, connected, fight, workout }) {
     if (workout) this.workoutEl.textContent = `⏱ ${clock(workout.seconds)}    🔥 ~${Math.round(workout.kcal)} kcal`;
     if (this.mode === "fight" && fight) {
       this.youBar.name.textContent = "YOU";
@@ -182,7 +157,7 @@ export class Hud {
       this.clockEl.textContent = clock;
       this.roundEl.classList.toggle("rest", fight.phase === "rest");
     }
-    this.guardEl.classList.toggle("on", guarding && (this.mode === "free" || this.mode === "fight"));
+    this.guardEl.classList.toggle("on", guarding && this.mode === "fight");
     this.status.textContent = connected ? "Camera connected" : "Camera off · keys: J/K punch · E elbow · N knee · hold G guard · hold ←/→ dodge";
     this.status.classList.toggle("ok", connected);
   }
@@ -271,8 +246,9 @@ export class Hud {
       info.append(side);
       this.result.append(img);
     }
-    const again = r.win ? (r.champion ? "Play again from stage 1" : "Next fight") : "Try again";
-    this.choicesEl = h("p", "choices", `◀ Punch LEFT: Menu        Punch RIGHT: ${again} ▶`);
+    // ไม่ต้องต่อยเลือก: ไฟต์ต่อไปเริ่มเองหลังพัก (nextFightIn) / แชมป์: ต่อยเพื่อกลับเมนู
+    this.nextLabel = r.win ? "Next fight" : "Try again";
+    this.choicesEl = h("p", "choices", r.champion ? "Punch to go back to the menu" : "");
     info.append(this.choicesEl);
     this.result.append(info);
     this.setMode("result");
@@ -310,10 +286,8 @@ export class Hud {
     return { img, side };
   }
 
-  /** Result screen after a win: counting down to the next fight (it starts by itself). */
+  /** Result screen: resting, then the next fight (or a retry) starts by itself. */
   nextFightIn(seconds) {
-    this.choicesEl.textContent = seconds > 0
-      ? `◀ Punch LEFT: Menu        Next fight in ${Math.ceil(seconds)}… ▶`
-      : "◀ Punch LEFT: Menu        Punch RIGHT: Next fight ▶";
+    this.choicesEl.textContent = `Rest… ${this.nextLabel} in ${Math.ceil(seconds)}`;
   }
 }

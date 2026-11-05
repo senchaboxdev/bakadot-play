@@ -74,11 +74,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; col
 #hud .round-clock { font-size: clamp(26px, 3.4vw, 40px); line-height: 1; font-variant-numeric: tabular-nums; }
 #hud .round.rest .round-label { color: var(--blue); }
 
-#hud[data-mode="free"] .fight-panel,
-#hud[data-mode="fight"] .free-panel,
-#hud[data-mode="menu"] .fight-panel, #hud[data-mode="menu"] .free-panel,
-#hud[data-mode="result"] .free-panel { display: none; }
-#hud[data-mode="free"] .free-panel { display: block; }
+#hud[data-mode="menu"] .fight-panel { display: none; }
 
 /* ป้าย/ข้อความ */
 #hud .banner { position: absolute; top: 34%; left: 0; right: 0; font-size: clamp(48px, 9vw, 110px); opacity: 0; text-shadow: 0 4px 0 #000, 0 0 30px rgba(0,0,0,.6); }
@@ -184,11 +180,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; col
 /* ระหว่างหน้าจอเริ่ม ซ่อนเมนูเกมด้านหลังไม่ให้ซ้อนตัวหนังสือ */
 body:has(#start:not([hidden])) #hud .screen { visibility: hidden; }
 
-/* ซ้อม: หลอดเลือดคู่ซ้อม */
-#hud .free-panel { min-width: min(92vw, 460px); }
-#hud .free-hp { margin-bottom: 6px; }
-#hud .free-title { font-size: 12px; letter-spacing: 3px; color: var(--gold); text-align: center; }
-#hud .free-panel .score { font-size: clamp(14px, 1.8vw, 20px); letter-spacing: 1px; white-space: nowrap; }
 #hud .pop[data-kind="miss"] { color: #b9c3d6; }
 
 /* เวลาออกกำลังกาย + แคลอรี */
@@ -196,7 +187,7 @@ body:has(#start:not([hidden])) #hud .screen { visibility: hidden; }
   position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 4px 16px 6px;
   font-size: clamp(15px, 1.8vw, 20px); white-space: pre; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 999px; display: none;
 }
-#hud[data-mode="free"] .workout, #hud[data-mode="fight"] .workout { display: block; }
+#hud[data-mode="fight"] .workout { display: block; }
 #hud .today { margin: 0; font-size: clamp(14px, 1.8vw, 18px); color: var(--green); font-weight: 400; }
 #hud .workout-sum { margin: 4px 0 0; font-size: clamp(16px, 2vw, 22px); color: var(--green); white-space: pre; }
 
@@ -233,7 +224,7 @@ body:has(#start:not([hidden])) #version, body:has(#hud[data-mode="menu"]) #versi
   position: absolute; left: 16px; bottom: 52px; width: 52px; height: 52px; display: none; pointer-events: auto; cursor: pointer;
   border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.5); background: rgba(0, 0, 0, 0.55); color: #fff; font: 700 22px var(--font);
 }
-#hud[data-mode="free"] .pause-btn, #hud[data-mode="fight"] .pause-btn { display: block; }
+#hud[data-mode="fight"] .pause-btn { display: block; }
 #hud[data-paused] .pause-btn { display: none; }
 #hud[data-paused] .paused { display: flex; pointer-events: auto; cursor: pointer; }
 #hud .action.restart { position: absolute; top: 12px; right: 12px; padding: 8px 18px; font-size: 15px; color: #f5f5f5; background: rgba(255, 255, 255, 0.12); box-shadow: none; border: 1px solid rgba(255, 255, 255, 0.35); } /* มุมขวาบน: จอมือถือแนวนอนเตี้ย ใต้การ์ดจะตกขอบจอ */

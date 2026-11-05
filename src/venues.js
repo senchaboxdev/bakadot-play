@@ -581,7 +581,7 @@ function buildForest(g) {
   sparkles(g, 240, inBox(-15, 15, Y0 + 0.3, Y0 + 3.6, -18, 3), { color: "#c8ff6a", k: 2.6, size: 0.06, drift: 0.9, twinkle: 1.2 }); // หิ่งห้อย
 }
 
-// ---------- ด่าน 7 + เล่นอิสระ: สนามใหญ่ ----------
+// ---------- ด่าน 7: สนามใหญ่ ----------
 
 const beamMaterial = new THREE.ShaderMaterial({
   uniforms: { color: { value: new THREE.Color("#fff1d6") }, strength: { value: 0.07 } },
